@@ -1,0 +1,901 @@
+{
+    "reasoning": "Applied i1 (add Singer & Halldorson node n51, connected to n35 and n37). Applied i2 (add story-grammar node n52, connected to n10 as contradicts). Applied i3 (add Bestgen & Vonk node n53, connected to n23). Applied i5 (add methodology assumption node n54). Applied i6 (corrected e49 edge type to 'supports'). Applied i7 (add Albrecht & Myers leather-couch node n55, connected to n30). Skipped i4 (n14 works fine as hub node). All other nodes and edges preserved unchanged.",
+  
+    "changes_applied": ["i1", "i2", "i3", "i5", "i6", "i7"],
+    "changes_skipped": [
+      { "issue_id": "i4", "reason": "n14's abstraction is functional — it serves as a hub node linking centering theory and empirical sub-findings; tightening it would fragment the backbone unnecessarily." }
+    ],
+  
+    "nodes": [
+      {
+        "id": "n1",
+        "type": "thesis",
+        "statement": "Comprehending a text requires readers to integrate sentence meanings into a situation model using real-world knowledge — the meaning of a coherent text is more than the sum of its individual sentence meanings.",
+        "grounding": {
+          "paragraph_id": "p-2",
+          "quote": "the meaning of a coherent text is more than the sum of the individual sentence meanings"
+        }
+      },
+      {
+        "id": "n2",
+        "type": "empirical_finding",
+        "statement": "A passage describing laundry procedures is incomprehensible without the title 'Laundry' but becomes immediately meaningful once the title is provided, demonstrating that real-world schemas are necessary for comprehension.",
+        "grounding": {
+          "paragraph_id": "p-10",
+          "quote": "if you were first told that it is describing doing your laundry, it becomes meaningful"
+        }
+      },
+      {
+        "id": "n3",
+        "type": "supporting_claim",
+        "statement": "Kintsch's model distinguishes three levels of text representation — surface form, propositional representation, and situation model — and discourse comprehension research focuses on how readers build the third from the second.",
+        "grounding": {
+          "paragraph_id": "p-13",
+          "quote": "These representations are called the surface representation, the propositional representation, and the situation model"
+        }
+      },
+      {
+        "id": "n4",
+        "type": "definition",
+        "statement": "The microstructure is a coherence graph linking propositions that share concepts, while the macrostructure is the gist of the text formed by attaching central propositions to pre-existing schemas.",
+        "grounding": {
+          "paragraph_id": "p-13",
+          "quote": "Microstructure is a level of representation that puts the propositions together into a connected structure; macrostructure is the gist of the text"
+        }
+      },
+      {
+        "id": "n5",
+        "type": "supporting_claim",
+        "statement": "Propositions in a text are linked through shared concepts, and the centrality of a proposition in the microstructure predicts both its memorability and its role in comprehension.",
+        "grounding": {
+          "paragraph_id": "p-32",
+          "quote": "Propositions with the same concept are said to overlap, and if the proposition that is being processed at one point in time shares a concept from a different proposition that is still in short-term memory, those two propositions can be linked together"
+        }
+      },
+      {
+        "id": "n6",
+        "type": "empirical_finding",
+        "statement": "McKoon & Ratcliff (1980) found that probe words closer in the propositional microstructure prime each other in memory even when equally distant in the surface text, confirming that memory encodes propositional rather than surface structure.",
+        "grounding": {
+          "paragraph_id": "p-40",
+          "quote": "McKoon and Ratcliff found that waiter primed documents more than napkins primed client indicating that WAITER and DOCUMENTS were more closely linked in memory than NAPKINS and CLIENT"
+        }
+      },
+      {
+        "id": "n7",
+        "type": "empirical_finding",
+        "statement": "McKoon & Ratcliff's second experiment with natural paragraphs showed that propositional proximity (not surface proximity) drove cross-sentence priming, replicating the microstructure result in more ecologically valid materials.",
+        "grounding": {
+          "paragraph_id": "p-45",
+          "quote": "Circulation among the Indians was vital which was near The fur traders were nomads in the propositional structure but far in the surface primed it more than Land ownership was not a problem"
+        }
+      },
+      {
+        "id": "n8",
+        "type": "assumption",
+        "statement": "Discourse theories assume readers encode and store the propositional content of text, connecting propositions into more global structures using a limited-capacity processing system.",
+        "grounding": {
+          "paragraph_id": "p-46",
+          "quote": "readers are generally thought to encode the basic ideas (the propositions) in a text and to connect them together into more global, integrative structures using a limited-capacity processing system"
+        }
+      },
+      {
+        "id": "n9",
+        "type": "supporting_claim",
+        "statement": "The Kintsch-van Dijk model's microstructure algorithm is insufficiently specified, relying on experimenter intuition rather than formal rules, which limits the definitiveness of supporting evidence.",
+        "grounding": {
+          "paragraph_id": "p-46",
+          "quote": "The model does not have a fully adequate algorithm for creating a microstructure. Creation of a microstructure depends to a great extent on an experimenter's intuition."
+        }
+      },
+      {
+        "id": "n10",
+        "type": "supporting_claim",
+        "statement": "Schemas are pre-stored knowledge structures for different situations that guide how text information is understood and stored, allowing readers to fill in information the writer omitted.",
+        "grounding": {
+          "paragraph_id": "p-52",
+          "quote": "the fundamental claim of schema theories is that we have pre-stored, possibly elaborate, knowledge structures for different situations that guide how all the information in the text is understood"
+        }
+      },
+      {
+        "id": "n11",
+        "type": "definition",
+        "statement": "A script is a representation of a stereotyped, socially sanctioned sequence of actions for a given setting (e.g., a restaurant visit) with default values that are incorporated into discourse comprehension.",
+        "grounding": {
+          "paragraph_id": "p-53",
+          "quote": "A script is one's representation of a more-or-less stereotyped, socially sanctioned, series of actions appropriate to a given setting."
+        }
+      },
+      {
+        "id": "n12",
+        "type": "supporting_claim",
+        "statement": "Schema theories ultimately reduce to the unfalsifiable claim that understanding depends on what we know, and no adequate formal theory of real-world knowledge exists.",
+        "grounding": {
+          "paragraph_id": "p-56",
+          "quote": "the predictions they made basically boil down to claiming that we are best at understanding what makes sense to us, and that what makes sense depends on what we know"
+        }
+      },
+      {
+        "id": "n52",
+        "type": "supporting_claim",
+        "statement": "Story grammars fail to generalize from sentence grammar to discourse because there is no sharp story/non-story boundary and readers can puzzle out narratives presented in highly twisted orders, unlike scrambled sentences.",
+        "grounding": {
+          "paragraph_id": "p-51",
+          "quote": "this structure is not like the grammar of a language. There is no clear line between a story and a non-story, as there is between a sentence and a non-sentence."
+        }
+      },
+      {
+        "id": "n13",
+        "type": "supporting_claim",
+        "statement": "Linguistic coherence devices — including anaphora, connectives, and given-new structure — are the primary means by which readers link propositions across sentences.",
+        "grounding": {
+          "paragraph_id": "p-58",
+          "quote": "These devices let the reader know when something already familiar in the text is being referred to, and when something new is being introduced."
+        }
+      },
+      {
+        "id": "n14",
+        "type": "supporting_claim",
+        "statement": "Pronoun resolution depends on distance, discourse topic status, morphological gender cues, and implicit causality — with different cues operating at different stages of processing.",
+        "grounding": {
+          "paragraph_id": "p-76",
+          "quote": "Although a pronoun is efficiently understood when its antecedent is a high-ranking forward-looking center of a previous sentence, other factors determine how and how easily it is understood."
+        }
+      },
+      {
+        "id": "n15",
+        "type": "empirical_finding",
+        "statement": "Clark & Sengul (1979) and Ehrlich & Rayner (1983) showed that increasing pronoun-antecedent distance slows reading — and that in 'far' conditions, eye fixations continue to lengthen for several fixations after the pronoun, ruling out strong immediacy.",
+        "grounding": {
+          "paragraph_id": "p-62",
+          "quote": "in the far condition got even longer... the process of searching for the antecedent may begin immediately, but in the case of the far condition, the search often continues for another fixation or two"
+        }
+      },
+      {
+        "id": "n16",
+        "type": "empirical_finding",
+        "statement": "Clifton & Ferreira (1987) found that physical distance per se had no effect on pronoun reading time when the antecedent remained the discourse topic, showing that topic status governs antecedent accessibility more than linear distance.",
+        "grounding": {
+          "paragraph_id": "p-69",
+          "quote": "Clifton and Ferreira also varied how far back in the passage that the antecedent organist was, and found that distance, per se, had no effect on reading time for the target sentence as long as topic status remained the same."
+        }
+      },
+      {
+        "id": "n17",
+        "type": "supporting_claim",
+        "statement": "Centering theory (Grosz et al.) predicts that the backward-looking center of a sentence should be realized as a pronoun, and departures from this are processed more slowly.",
+        "grounding": {
+          "paragraph_id": "p-70",
+          "quote": "in a coherent discourse, sentences tend to keep talking about entities and events that were mentioned in earlier sentences... The backward-looking center must be realized as a pronoun, if any element in its sentence is."
+        }
+      },
+      {
+        "id": "n18",
+        "type": "empirical_finding",
+        "statement": "Gordon et al. found a 'repeated name penalty': replacing a pronoun with a full noun phrase for the backward-looking center slows reading, confirming that centering-based pronominal expectations operate during comprehension.",
+        "grounding": {
+          "paragraph_id": "p-75",
+          "quote": "The later sentences in 9.6b were read more slowly than those in 9.6a. Gordon et al. proposed that this was because the pronoun in the second sentence of 9.6a is an appropriate backwards-looking center"
+        }
+      },
+      {
+        "id": "n19",
+        "type": "empirical_finding",
+        "statement": "Vonk (1984) showed that gender-disambiguating cues speed antecedent assignment immediately (first-pass reading), while implicit-causality cues produce delayed effects (second-pass), revealing a two-stage resolution process.",
+        "grounding": {
+          "paragraph_id": "p-87",
+          "quote": "readers quickly assign the antecedent of a pronoun that is disambiguated by gender, but delay making the assignment when it is determined by implicit causality"
+        }
+      },
+      {
+        "id": "n20",
+        "type": "supporting_claim",
+        "statement": "Definite noun phrases signal that their referent has already been introduced into the discourse model, and readers are slowed when this expectation is violated.",
+        "grounding": {
+          "paragraph_id": "p-98",
+          "quote": "readers are exquisitely sensitive to whether a definite noun phrase has an appropriate antecedent in a discourse"
+        }
+      },
+      {
+        "id": "n21",
+        "type": "empirical_finding",
+        "statement": "Yekovich & Walker (1978) found that reading 'The attorney examined...' was slower after 'asked for an attorney' than 'asked for the attorney', because the indefinite article fails to introduce a specific referent for the definite NP.",
+        "grounding": {
+          "paragraph_id": "p-101",
+          "quote": "The second sentence of 9.12a was read more slowly when the first sentence had contained an attorney than when it had contained the attorney"
+        }
+      },
+      {
+        "id": "n22",
+        "type": "empirical_finding",
+        "statement": "Garrod & Sanford (1977) found that resolving a superordinate NP ('the bird') to an atypical instance ('goose') takes longer than to a typical one ('robin'), because typicality affects referent accessibility.",
+        "grounding": {
+          "paragraph_id": "p-105",
+          "quote": "readers took longer to read the second sentence in examples like 9.13b than 9.13a. If the concept in the first sentence is a less-typical member of the superordinate category, it is apparently accessed as a referent of the superordinate term the bird less quickly."
+        }
+      },
+      {
+        "id": "n23",
+        "type": "supporting_claim",
+        "statement": "Reading is slowed when the temporal order of events in a text mismatches their chronological order, and when large time shifts occur between described events.",
+        "grounding": {
+          "paragraph_id": "p-111",
+          "quote": "Reading is slowed when the temporal order of propositions in a text does not match the chronological order of the events they denote (Mandler, 1986). Reading is also slower when there is a large time shift in the narrative"
+        }
+      },
+      {
+        "id": "n53",
+        "type": "empirical_finding",
+        "statement": "Bestgen & Vonk (2000) found that a thematically incongruent sentence costs extra reading time, but when preceded by a temporal adverb signaling a setting change, this cost becomes small and non-significant.",
+        "grounding": {
+          "paragraph_id": "p-117",
+          "quote": "the thematically incongruent sentence, 9.16b, is read more slowly than the congruent one, 9.16a (Bestgen & Vonk, 2000). Very interestingly, however, if the target sentence was preceded by a temporal adverb that indicates a change in time and possible setting... the reading time cost of the thematically incongruent sentence becomes smaller and nonsignificant."
+        }
+      },
+      {
+        "id": "n24",
+        "type": "empirical_finding",
+        "statement": "Haberlandt (1982) showed that reading a passage like 'The passengers were terrified... the pilot made a safe landing' was faster when the connective 'however' was present, confirming that connectives accelerate inter-propositional integration.",
+        "grounding": {
+          "paragraph_id": "p-120",
+          "quote": "Reading was faster when the connective (the adversative however in this example) was present than when it was not."
+        }
+      },
+      {
+        "id": "n25",
+        "type": "definition",
+        "statement": "The given-new contract is an implicit agreement between writer and reader to signal which information is already in the reader's mental model (given) and which is to be added (new), typically encoded via syntactic position and prosody.",
+        "grounding": {
+          "paragraph_id": "p-126",
+          "quote": "Clark and Haviland (1977) proposed that there is an implicit 'contract' between writer and reader... to phrase sentences in a way that makes it clear what links to the prior discourse and what adds new information."
+        }
+      },
+      {
+        "id": "n26",
+        "type": "empirical_finding",
+        "statement": "Hornby (1974) found that listeners were more likely to miss mismatches between a sentence and a picture when the critical information was expressed as given (presupposed) rather than as new (focused), showing that presupposed content receives less scrutiny.",
+        "grounding": {
+          "paragraph_id": "p-129",
+          "quote": "they were more likely to overlook the mismatch between the sentence and the picture if they had heard 9.19a than if they had heard 9.19b"
+        }
+      },
+      {
+        "id": "n27",
+        "type": "empirical_finding",
+        "statement": "Birch, Albrecht & Myers (2000) found that probe words appearing in a focused (it-cleft) position were responded to more quickly in a delayed recognition test, showing focused information is better encoded in memory.",
+        "grounding": {
+          "paragraph_id": "p-135",
+          "quote": "recognition probes that were delayed 10 seconds after the end of a text were responded to more quickly when the word they probed had appeared in a focused position"
+        }
+      },
+      {
+        "id": "n28",
+        "type": "empirical_finding",
+        "statement": "Cowles et al. (2007) found that words in focused positions elicited a P3b ERP response (indicating increased processing), while given information appearing in a focused position elicited an N400 (indicating anomaly detection).",
+        "grounding": {
+          "paragraph_id": "p-153",
+          "quote": "a word that appears in a focused position (e.g., the it-cleft) elicited a brain electrical response (a P3b)... Given information was presented in the focused position... it elicited an N400 brain electrical response."
+        }
+      },
+      {
+        "id": "n29",
+        "type": "empirical_finding",
+        "statement": "Haviland & Clark (1974) showed that 'The beer was warm' is read slower after 'Horace got some picnic supplies' than after 'Horace got some beer', because the reader must make an inferential bridge to accommodate the definite reference.",
+        "grounding": {
+          "paragraph_id": "p-152",
+          "quote": "The reader has to make an inference that beer must have been included in the picnic supplies and add beer to the discourse representation. This takes extra time"
+        }
+      },
+      {
+        "id": "n30",
+        "type": "supporting_claim",
+        "statement": "Memory reinstatement of earlier discourse content occurs via both passive resonance (automatic reactivation of conceptually related content) and active goal-tracking (maintaining unsatisfied goals in heightened accessibility).",
+        "grounding": {
+          "paragraph_id": "p-158",
+          "quote": "it appears that both passive resonance processes and active processes of meaningful interpretation play roles in text comprehension"
+        }
+      },
+      {
+        "id": "n31",
+        "type": "empirical_finding",
+        "statement": "Albrecht & O'Brien (1993) found that reading time for 'Mary ordered a cheeseburger' was slower after Mary had been introduced as a vegetarian — even after intervening filler text — demonstrating passive resonance reactivation.",
+        "grounding": {
+          "paragraph_id": "p-157",
+          "quote": "This sentence was perfectly coherent with the preceding few sentences, but nonetheless was read more slowly than it was in a neutral passage that had given no information about Mary's eating habits."
+        }
+      },
+      {
+        "id": "n32",
+        "type": "empirical_finding",
+        "statement": "O'Brien et al. (1998) found that resonance-based slow-down persisted even when intervening text explicitly stated the earlier information was outdated, showing resonance operates dumbly without regard to the current validity of the reinstated information.",
+        "grounding": {
+          "paragraph_id": "p-157",
+          "quote": "A similar slowing of reading was observed even though the text that intervened... explicitly said that Mary was no longer a vegetarian."
+        }
+      },
+      {
+        "id": "n33",
+        "type": "empirical_finding",
+        "statement": "Suh & Trabasso (1993) found that memory for a bicycle-wanting goal was more salient when the goal was unsatisfied, showing that readers actively track goal states and maintain them as long as they are unfulfilled.",
+        "grounding": {
+          "paragraph_id": "p-158",
+          "quote": "memory for the bicycle goal was more salient if the goal was not yet satisfied than if it had been satisfied"
+        }
+      },
+      {
+        "id": "n55",
+        "type": "empirical_finding",
+        "statement": "Albrecht & Myers (1995) found that mentioning an arbitrary object associated with an unsatisfied goal (the leather couch) was enough to reinstate the goal and slow reading of an inconsistent continuation, showing that passive associative cues can trigger active goal-tracking.",
+        "grounding": {
+          "paragraph_id": "p-158",
+          "quote": "calling this event to mind (by referring to the leather couch immediately before the target sentence) was enough to slow readers down on the target sentence if the goal of making an airline reservation had not been satisfied."
+        }
+      },
+      {
+        "id": "n34",
+        "type": "supporting_claim",
+        "statement": "Readers are generally cautious about making inferences, preferring to wait until an inference is required for coherence rather than generating unconstrained elaborations.",
+        "grounding": {
+          "paragraph_id": "p-167",
+          "quote": "A general conclusion from a lot of research is that readers are cautious. They often appear to wait until they must make an inference before they make it."
+        }
+      },
+      {
+        "id": "n54",
+        "type": "assumption",
+        "statement": "Reading time and lexical decision probe RT are the primary methodological tools for detecting inference-making, but different techniques sometimes yield conflicting results, requiring convergence across methods for confident conclusions.",
+        "grounding": {
+          "paragraph_id": "p-167",
+          "quote": "Different experimental techniques seem to yield somewhat different results... When the results of different techniques all suggest that an inference has been made, one can have confidence in that conclusion. But quite often, techniques point in different directions"
+        }
+      },
+      {
+        "id": "n35",
+        "type": "definition",
+        "statement": "A bridging inference is an inference that must be made to tie a new proposition into the existing discourse model without which the text would lack coherence.",
+        "grounding": {
+          "paragraph_id": "p-169",
+          "quote": "A bridging inference is made when something has to be added to the discourse model to tie a new proposition into the previous model. Without such an inference the text would lack coherence."
+        }
+      },
+      {
+        "id": "n36",
+        "type": "empirical_finding",
+        "statement": "Keenan & Kintsch (1974) found that readers verified 'Was Bob Birch the man in hiding?' as fast as explicitly stated facts after a 15-minute delay, confirming that bridging inferences become incorporated into the discourse memory.",
+        "grounding": {
+          "paragraph_id": "p-175",
+          "quote": "They were as fast verifying a statement like this as when it had been explicitly presented in the text."
+        }
+      },
+      {
+        "id": "n37",
+        "type": "empirical_finding",
+        "statement": "Myers, Shinjo & Duffy (1987) showed that reading time for a test sentence increased as prior-sentence relatedness decreased, and that successful bridging (medium relatedness) produced better memory for the bridged content than easy or failed bridging.",
+        "grounding": {
+          "paragraph_id": "p-179",
+          "quote": "The test sentence was read more slowly as the preceding sentence was less related to it... recall was better in the medium relatedness passage than in either of the others."
+        }
+      },
+      {
+        "id": "n51",
+        "type": "empirical_finding",
+        "statement": "Singer & Halldorson (1996) found that a dental-health bridging context (implying an appointment) speeded verification of 'Do dentists require appointments?' compared to a dental-bill context, showing that causal bridging activates specific world knowledge.",
+        "grounding": {
+          "paragraph_id": "p-185",
+          "quote": "The decision was made more quickly following the passage in 9.27a than following the similar one in 9.27b. Making the bridge in the former case activated pre-existing knowledge that dentists require appointments, which in turn speeded verification."
+        }
+      },
+      {
+        "id": "n38",
+        "type": "definition",
+        "statement": "An elaborative inference enriches the discourse model beyond what coherence strictly requires — such as inferring a car from 'Keith drove to London' even though a car need not be represented for the sentence to be coherent.",
+        "grounding": {
+          "paragraph_id": "p-190",
+          "quote": "since its existence was not needed to make the sentence Keith drove to London coherent, it could not be considered a bridging inference. It is generally called an elaborative inference."
+        }
+      },
+      {
+        "id": "n39",
+        "type": "empirical_finding",
+        "statement": "Singer (1979) showed that 'The shovel was heavy' was read slower after 'The boy cleared snow from the stairs' than after an explicit shovel mention, demonstrating that instrumental elaborative inferences are not routinely generated during reading.",
+        "grounding": {
+          "paragraph_id": "p-205",
+          "quote": "The reading time for the second sentence was longer in 9.31b than in 9.31a, indicating that integrating shovel with the prior sentence was more difficult when it was not explicitly mentioned."
+        }
+      },
+      {
+        "id": "n40",
+        "type": "empirical_finding",
+        "statement": "O'Brien, Shank, Myers & Rayner (1988) found that readers inferred 'knife' from 'stabbed with his weapon' when a highly typical instrument was implied — eye fixations on 'knife' were no longer than when knife had been explicitly mentioned.",
+        "grounding": {
+          "paragraph_id": "p-208",
+          "quote": "O'Brien et al. measured eye movements while reading the last sentence of 9.32 and found fixation durations on knife were no longer than when the sentence followed a version of the passage in which knife had been explicitly mentioned previously"
+        }
+      },
+      {
+        "id": "n41",
+        "type": "empirical_finding",
+        "statement": "Duffy (1986) ruled out the specific-prediction model for causal elaborative inferences: a probe for 'soup' was no more available after a screech-to-halt sentence than after a slow-down sentence, despite faster continuation judgments in the former condition.",
+        "grounding": {
+          "paragraph_id": "p-219",
+          "quote": "In fact, there was no difference between the two conditions, suggesting that such an inference was not made."
+        }
+      },
+      {
+        "id": "n42",
+        "type": "supporting_claim",
+        "statement": "Causal inference in reading operates via 'focusing/highlighting': readers raise the salience of causally important sentences so they are accessible for future linkage, without generating specific predictions.",
+        "grounding": {
+          "paragraph_id": "p-220",
+          "quote": "it appears to be a process of highlighting information that you are likely to need later on so that the highlighted information is readily accessible for future linkage."
+        }
+      },
+      {
+        "id": "n43",
+        "type": "supporting_claim",
+        "statement": "Constructing a situation model is the principal goal of reading: the reader aims to build a rich mental representation of the real-world scenario that integrates agents, spatial relations, time, goals, and causal structure.",
+        "grounding": {
+          "paragraph_id": "p-232",
+          "quote": "constructing a mental representation of the situation or scenario that is described is the principal goal of reading an expository text"
+        }
+      },
+      {
+        "id": "n44",
+        "type": "supporting_claim",
+        "statement": "A situation model goes beyond the propositions in a text: it encodes world-knowledge constraints such that structurally identical texts can describe possible or impossible states of affairs.",
+        "grounding": {
+          "paragraph_id": "p-234",
+          "quote": "The propositions are nearly the same, but, because of background knowledge you bring to bear in constructing a representation of the situation being talked about, you know that the situation is impossible."
+        }
+      },
+      {
+        "id": "n45",
+        "type": "empirical_finding",
+        "statement": "Garnham (1987) found that readers retained accurate situation-model content but not surface form: when not warned of a verbatim memory test, readers were equally likely to accept two differently-worded descriptions of the same event.",
+        "grounding": {
+          "paragraph_id": "p-238",
+          "quote": "if they had not been so warned they were almost equally likely to choose either of these two sentences... They had apparently formed an accurate mental model of what happened at the party, but lost most of the information about how the text described the events."
+        }
+      },
+      {
+        "id": "n46",
+        "type": "empirical_finding",
+        "statement": "Glenberg, Meyer & Lindem (1987) found that probes for 'sweatshirt' were slower when John had removed it than when he was wearing it, showing that the situation model tracks the current state of objects in relation to characters.",
+        "grounding": {
+          "paragraph_id": "p-241",
+          "quote": "participants took longer to respond 'yes' in a version of the paragraph where John took off his sweatshirt than in a version where he put it on."
+        }
+      },
+      {
+        "id": "n47",
+        "type": "empirical_finding",
+        "statement": "Bower & Morrow (1990) found that judgments about whether two objects were in the same room were slower the further those objects were from the character's current location in the narrative, demonstrating that spatial situation models are built and updated in real time.",
+        "grounding": {
+          "paragraph_id": "p-242",
+          "quote": "Decisions were slower when the objects were further away from the room where the character was when the text was interrupted"
+        }
+      },
+      {
+        "id": "n48",
+        "type": "empirical_finding",
+        "statement": "Garrod & Terras (2000) found that reading an unexpected instrument (pen in a blackboard context) produced longer go-past and second-pass times, showing that the situation model sets up instrument expectations that affect fluency when violated.",
+        "grounding": {
+          "paragraph_id": "p-255",
+          "quote": "go-past time on the verb dropped was substantially longer for pen dropped following the blackboard context than following the letter of complaint context"
+        }
+      },
+      {
+        "id": "n49",
+        "type": "supporting_claim",
+        "statement": "Readability formulas that correlate surface text variables with reading speed have practical predictive value but cannot support causal claims about discourse processing because word length, frequency, and conceptual complexity are confounded.",
+        "grounding": {
+          "paragraph_id": "p-265",
+          "quote": "one cannot be sure whether the relation is due to the fact that longer words have more visual information, or because longer words are less frequent and thus harder to locate in the lexicon... There is no way to understand from correlational data which aspect is truly operative"
+        }
+      },
+      {
+        "id": "n50",
+        "type": "supporting_claim",
+        "statement": "A complete theory of discourse comprehension would require a complete theory of world knowledge, which currently does not exist and may not be achievable.",
+        "grounding": {
+          "paragraph_id": "p-275",
+          "quote": "The processes involved in comprehending text and making mental models of what is read use, in principle, all of our knowledge... We have to accept that our theories of mental models and inference process, etc., are incomplete at best"
+        }
+      }
+    ],
+  
+    "edges": [
+      {
+        "id": "e1",
+        "source": "n2",
+        "target": "n1",
+        "type": "is_evidence_for",
+        "reasoning": "The laundry demonstration directly illustrates that sentence-level meaning is insufficient — real-world schematic knowledge (provided by the title) is required, supporting the thesis."
+      },
+      {
+        "id": "e2",
+        "source": "n3",
+        "target": "n1",
+        "type": "elaborates",
+        "reasoning": "Kintsch's three-level framework provides the theoretical vocabulary for the thesis, distinguishing the situation model as the target level of discourse comprehension."
+      },
+      {
+        "id": "e3",
+        "source": "n4",
+        "target": "n3",
+        "type": "elaborates",
+        "reasoning": "The microstructure/macrostructure distinction articulates the internal structure of the discourse representation described by Kintsch's framework."
+      },
+      {
+        "id": "e4",
+        "source": "n5",
+        "target": "n3",
+        "type": "supports",
+        "reasoning": "The mechanism by which propositions are linked (shared concepts → microstructure) is the central claim of Kintsch's model that subsequent empirical work tests."
+      },
+      {
+        "id": "e5",
+        "source": "n6",
+        "target": "n5",
+        "type": "is_evidence_for",
+        "reasoning": "McKoon & Ratcliff's priming finding directly confirms that readers mentally link propositions by propositional overlap, not surface distance."
+      },
+      {
+        "id": "e6",
+        "source": "n7",
+        "target": "n5",
+        "type": "is_evidence_for",
+        "reasoning": "The natural-paragraph replication strengthens the claim that propositional structure (not surface proximity) governs discourse memory."
+      },
+      {
+        "id": "e7",
+        "source": "n9",
+        "target": "n5",
+        "type": "contradicts",
+        "reasoning": "The lack of a formal microstructure algorithm means existing supporting evidence could reflect experimenter intuition rather than the model's intrinsic properties."
+      },
+      {
+        "id": "e8",
+        "source": "n8",
+        "target": "n3",
+        "type": "assumes",
+        "reasoning": "Kintsch's framework presupposes that readers encode propositions and connect them; this assumption underlies the testable predictions about memory and reading time."
+      },
+      {
+        "id": "e9",
+        "source": "n10",
+        "target": "n1",
+        "type": "supports",
+        "reasoning": "Schemas provide the mechanism by which real-world knowledge enables coherent text comprehension, directly instantiating the thesis."
+      },
+      {
+        "id": "e10",
+        "source": "n11",
+        "target": "n10",
+        "type": "elaborates",
+        "reasoning": "Scripts are a specific, event-sequence form of schema that operate in discourse comprehension, providing the most worked-out schema example."
+      },
+      {
+        "id": "e11",
+        "source": "n12",
+        "target": "n10",
+        "type": "contradicts",
+        "reasoning": "The unfalsifiability critique limits the theoretical power of schema theory — without a grammar of knowledge, schemas cannot be formalized enough to generate strong predictions."
+      },
+      {
+        "id": "e52",
+        "source": "n52",
+        "target": "n10",
+        "type": "contradicts",
+        "reasoning": "Story grammars were an attempt to extend schema-like structure to narrative, but their failure shows that discourse structure cannot be fully formalized the way sentence grammar is — reinforcing n12's critique from a different angle."
+      },
+      {
+        "id": "e12",
+        "source": "n13",
+        "target": "n1",
+        "type": "supports",
+        "reasoning": "Linguistic coherence devices are the textual mechanisms through which the integration required by the thesis is accomplished."
+      },
+      {
+        "id": "e13",
+        "source": "n14",
+        "target": "n13",
+        "type": "elaborates",
+        "reasoning": "Pronoun anaphora is a key linguistic device for sentence integration, and this claim specifies the multiple factors that modulate its use."
+      },
+      {
+        "id": "e14",
+        "source": "n15",
+        "target": "n14",
+        "type": "is_evidence_for",
+        "reasoning": "The distance effect provides evidence that antecedent distance is one factor in pronoun processing, and the extended fixation pattern shows the search process is not fully immediate."
+      },
+      {
+        "id": "e15",
+        "source": "n16",
+        "target": "n14",
+        "type": "is_evidence_for",
+        "reasoning": "By dissociating surface distance from topic status, Clifton & Ferreira show that topic/structural factors, not raw distance, govern pronoun accessibility."
+      },
+      {
+        "id": "e16",
+        "source": "n16",
+        "target": "n15",
+        "type": "contradicts",
+        "reasoning": "If topic status overrides distance, then distance effects may reflect confounded topic-status effects rather than pure linear distance."
+      },
+      {
+        "id": "e17",
+        "source": "n17",
+        "target": "n14",
+        "type": "supports",
+        "reasoning": "Centering theory provides a formal linguistic account of why structural factors (backward-looking center) govern pronoun use, underpinning the empirical findings about topic status."
+      },
+      {
+        "id": "e18",
+        "source": "n18",
+        "target": "n17",
+        "type": "is_evidence_for",
+        "reasoning": "The repeated-name penalty directly tests centering theory's prediction that realizing the backward-looking center as a full NP disrupts processing."
+      },
+      {
+        "id": "e19",
+        "source": "n19",
+        "target": "n14",
+        "type": "is_evidence_for",
+        "reasoning": "Vonk's dissociation of gender (immediate) vs. implicit-causality (delayed) effects shows that different antecedent-determination cues operate at distinct processing stages."
+      },
+      {
+        "id": "e20",
+        "source": "n20",
+        "target": "n13",
+        "type": "elaborates",
+        "reasoning": "Nominal anaphora (definite NPs) is a second class of coherence device beyond pronouns, extending the general claim."
+      },
+      {
+        "id": "e21",
+        "source": "n21",
+        "target": "n20",
+        "type": "is_evidence_for",
+        "reasoning": "Yekovich & Walker's attorney study demonstrates reading disruption when a definite NP lacks a proper discourse antecedent."
+      },
+      {
+        "id": "e22",
+        "source": "n22",
+        "target": "n20",
+        "type": "is_evidence_for",
+        "reasoning": "Garrod & Sanford's typicality effect shows that even when an antecedent exists, its accessibility depends on category typicality."
+      },
+      {
+        "id": "e23",
+        "source": "n23",
+        "target": "n13",
+        "type": "supports",
+        "reasoning": "Temporal ordering mismatches show that readers use event-sequence structure to integrate propositions, extending the coherence device repertoire."
+      },
+      {
+        "id": "e53",
+        "source": "n53",
+        "target": "n23",
+        "type": "is_evidence_for",
+        "reasoning": "Bestgen & Vonk's finding that temporal adverbs reduce thematic incongruence costs directly shows that temporal structure cues modulate thematic integration."
+      },
+      {
+        "id": "e24",
+        "source": "n24",
+        "target": "n13",
+        "type": "is_evidence_for",
+        "reasoning": "Haberlandt's connective study directly shows that linguistic connectives accelerate integration of causally related propositions."
+      },
+      {
+        "id": "e25",
+        "source": "n25",
+        "target": "n13",
+        "type": "elaborates",
+        "reasoning": "The given-new contract is a third major discourse-level device (alongside anaphora and connectives) by which sentences are integrated into a prior discourse representation."
+      },
+      {
+        "id": "e26",
+        "source": "n26",
+        "target": "n25",
+        "type": "is_evidence_for",
+        "reasoning": "Hornby's finding that presupposed content escapes critical scrutiny demonstrates that the given-new distinction has processing consequences for how readers allocate attention."
+      },
+      {
+        "id": "e27",
+        "source": "n27",
+        "target": "n25",
+        "type": "is_evidence_for",
+        "reasoning": "Birch et al.'s delayed probe advantage for focused items shows that new/focused information receives privileged encoding, consistent with the given-new contract's predictions."
+      },
+      {
+        "id": "e28",
+        "source": "n28",
+        "target": "n25",
+        "type": "is_evidence_for",
+        "reasoning": "Cowles et al.'s ERP data provides neural-level evidence that focused positions trigger increased processing (P3b) and that given-new violations are flagged as anomalies (N400)."
+      },
+      {
+        "id": "e29",
+        "source": "n29",
+        "target": "n25",
+        "type": "is_evidence_for",
+        "reasoning": "Haviland & Clark's reading-time effect measures the extra processing cost of bridging the gap when given information lacks an antecedent, operationalizing the given-new contract."
+      },
+      {
+        "id": "e30",
+        "source": "n30",
+        "target": "n1",
+        "type": "supports",
+        "reasoning": "Memory reinstatement integrates new sentences with information no longer in active memory, contributing to the coherent situation model required by the thesis."
+      },
+      {
+        "id": "e31",
+        "source": "n31",
+        "target": "n30",
+        "type": "is_evidence_for",
+        "reasoning": "The vegetarian/cheeseburger study demonstrates passive resonance: earlier character information is reactivated when semantically inconsistent content is encountered after a gap."
+      },
+      {
+        "id": "e32",
+        "source": "n32",
+        "target": "n30",
+        "type": "is_evidence_for",
+        "reasoning": "The finding that outdated vegetarian information still triggers slow-down shows resonance is passive (not strategically monitored), supporting the mechanistic characterization."
+      },
+      {
+        "id": "e33",
+        "source": "n33",
+        "target": "n30",
+        "type": "is_evidence_for",
+        "reasoning": "Suh & Trabasso's goal-salience finding demonstrates the active, meaning-guided component of reinstatement, complementing the dumb resonance evidence."
+      },
+      {
+        "id": "e55",
+        "source": "n55",
+        "target": "n30",
+        "type": "is_evidence_for",
+        "reasoning": "Albrecht & Myers show that arbitrary associative cues can bridge passive resonance into active goal-tracking, illustrating how the two processes interact."
+      },
+      {
+        "id": "e34",
+        "source": "n34",
+        "target": "n1",
+        "type": "supports",
+        "reasoning": "Readers' conservatism about inference-making shows that making the required bridging inferences for coherence is the key inferential task, not unconstrained elaboration."
+      },
+      {
+        "id": "e54",
+        "source": "n54",
+        "target": "n34",
+        "type": "assumes",
+        "reasoning": "The reader-caution claim rests on interpreting reading time and probe data as evidence of inference absence; this is only warranted given the methodological assumption that convergent evidence is required."
+      },
+      {
+        "id": "e35",
+        "source": "n35",
+        "target": "n34",
+        "type": "elaborates",
+        "reasoning": "Bridging inferences define the required-for-coherence subset, clarifying the claim that readers make inferences when (and because) they are needed."
+      },
+      {
+        "id": "e36",
+        "source": "n36",
+        "target": "n35",
+        "type": "is_evidence_for",
+        "reasoning": "Keenan & Kintsch's verification result shows bridging inferences become part of the discourse memory representation, confirming they are made and incorporated."
+      },
+      {
+        "id": "e37",
+        "source": "n37",
+        "target": "n35",
+        "type": "is_evidence_for",
+        "reasoning": "Myers et al.'s graded reading-time and memory effects show that bridging difficulty scales with inferential distance, and that successful bridging enhances memory."
+      },
+      {
+        "id": "e56",
+        "source": "n51",
+        "target": "n35",
+        "type": "is_evidence_for",
+        "reasoning": "Singer & Halldorson show that causal bridging activates specific background knowledge, demonstrating that bridging inferences connect text to existing world-knowledge networks."
+      },
+      {
+        "id": "e38",
+        "source": "n38",
+        "target": "n34",
+        "type": "elaborates",
+        "reasoning": "Elaborative inferences define the boundary where reader caution is most clearly tested: inferences that go beyond coherence requirements."
+      },
+      {
+        "id": "e39",
+        "source": "n39",
+        "target": "n34",
+        "type": "is_evidence_for",
+        "reasoning": "Singer's instrumental inference result directly confirms reader caution: even an obvious instrumental inference is not routinely made."
+      },
+      {
+        "id": "e40",
+        "source": "n40",
+        "target": "n34",
+        "type": "elaborates",
+        "reasoning": "O'Brien et al.'s stab/knife finding shows the boundary condition: when context is highly constraining, readers do make elaborative inferences — refining the cautious-inference principle to 'unless highly constrained'."
+      },
+      {
+        "id": "e41",
+        "source": "n41",
+        "target": "n42",
+        "type": "is_evidence_for",
+        "reasoning": "The null probe result directly rules out specific-prediction and supports focusing/highlighting as the mechanism."
+      },
+      {
+        "id": "e42",
+        "source": "n42",
+        "target": "n34",
+        "type": "supports",
+        "reasoning": "Highlighting is consistent with reader caution: readers flag sentences for future use rather than generating specific inferences, minimizing the cost of being wrong."
+      },
+      {
+        "id": "e43",
+        "source": "n43",
+        "target": "n1",
+        "type": "supports",
+        "reasoning": "The situation model claim directly instantiates the thesis: comprehension aims at building a model of the described situation, not a propositional record of the text."
+      },
+      {
+        "id": "e44",
+        "source": "n44",
+        "target": "n43",
+        "type": "supports",
+        "reasoning": "The wallpaper demonstration shows that situation models encode world-knowledge constraints beyond propositional content."
+      },
+      {
+        "id": "e45",
+        "source": "n45",
+        "target": "n43",
+        "type": "is_evidence_for",
+        "reasoning": "Garnham's memory result shows readers preserve the situation but not surface form, directly evidencing situation-model-level encoding."
+      },
+      {
+        "id": "e46",
+        "source": "n46",
+        "target": "n43",
+        "type": "is_evidence_for",
+        "reasoning": "Glenberg et al.'s object-accessibility effect shows the situation model is dynamically updated to track current character-object relationships."
+      },
+      {
+        "id": "e47",
+        "source": "n47",
+        "target": "n43",
+        "type": "is_evidence_for",
+        "reasoning": "Bower & Morrow's spatial distance effect shows that readers build and update spatial situation models in real time."
+      },
+      {
+        "id": "e48",
+        "source": "n48",
+        "target": "n43",
+        "type": "is_evidence_for",
+        "reasoning": "Garrod & Terras's instrument-context fluency effect shows the mental model sets up expectations that create reading advantage when confirmed."
+      },
+      {
+        "id": "e49",
+        "source": "n49",
+        "target": "n1",
+        "type": "supports",
+        "reasoning": "The failure of correlational readability research to causally explain discourse processing supports the thesis that comprehension depends on deeper theory-grounded processing that surface metrics cannot capture."
+      },
+      {
+        "id": "e50",
+        "source": "n50",
+        "target": "n43",
+        "type": "elaborates",
+        "reasoning": "The intractability of world-knowledge formalization defines the theoretical horizon of situation models: they can represent anything known about a situation, but a complete theory remains out of reach."
+      },
+      {
+        "id": "e51",
+        "source": "n29",
+        "target": "n35",
+        "type": "is_evidence_for",
+        "reasoning": "The 'picnic supplies / the beer' reading-time result is the classic bridging inference demonstration — readers make the inference when forced to by a definite NP."
+      }
+    ]
+  }
