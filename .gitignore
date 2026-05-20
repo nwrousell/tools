@@ -2,3 +2,7 @@ node_modules/
 dist/
 *.log
 .vite
+anime-vocab/data/
+anime-vocab/cache.json
+anime-vocab/results.json
+anime-vocab/__pycache__/

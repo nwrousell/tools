@@ -1,0 +1,9 @@
+# unidic-lite's setup.py requires setuptools < 60 to build.
+# The Makefile's `install` target handles this automatically.
+# If installing manually: pip install "setuptools<60" first.
+setuptools<60
+fugashi>=1.3.0
+unidic-lite>=1.0.8
+requests>=2.31.0
+ass>=0.5.2
+rich>=13.0.0
