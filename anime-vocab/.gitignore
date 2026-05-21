@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+data/
+cache.json
+stats.csv
+enriched.csv
+results.json
