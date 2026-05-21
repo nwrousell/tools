@@ -1,8 +1,6 @@
 import json
 import re
-import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
@@ -10,9 +8,7 @@ import requests
 
 _ENDPOINT = "https://graphql.anilist.co"
 
-_QUERY = """
-query ($search: String) {
-  Media(search: $search, type: ANIME) {
+_MEDIA_FIELDS = """
     id
     title { romaji english native }
     genres
@@ -21,25 +17,9 @@ query ($search: String) {
     seasonYear
     status
     format
-  }
-}
 """
 
 _SEASON_STRIP = re.compile(r"[\[【(].*?[\]】)]|\s+\d+期$|\s+Season\s+\d+$", re.IGNORECASE)
-
-
-class RateLimiter:
-    def __init__(self, rate: float = 1.0):
-        self._lock = threading.Lock()
-        self._interval = 1.0 / rate
-        self._last = 0.0
-
-    def acquire(self) -> None:
-        with self._lock:
-            wait = self._interval - (time.time() - self._last)
-            if wait > 0:
-                time.sleep(wait)
-            self._last = time.time()
 
 
 def load_cache(path: Path) -> dict:
@@ -61,88 +41,119 @@ def _clean_name(name: str) -> str:
     return _SEASON_STRIP.sub("", name).strip()
 
 
-def _query_anilist(search: str, limiter: RateLimiter) -> dict | None:
-    limiter.acquire()
-    try:
-        resp = requests.post(
-            _ENDPOINT,
-            json={"query": _QUERY, "variables": {"search": search}},
-            timeout=10,
-        )
+def _parse_media(data: dict) -> dict:
+    title = data.get("title", {})
+    return {
+        "id": data["id"],
+        "title_romaji": title.get("romaji"),
+        "title_english": title.get("english"),
+        "title_native": title.get("native"),
+        "genres": data.get("genres", []),
+        "score": data.get("averageScore"),
+        "episodes": data.get("episodes"),
+        "year": data.get("seasonYear"),
+        "status": data.get("status"),
+        "format": data.get("format"),
+    }
 
-        if resp.status_code == 429:
+
+def _do_request(payload: dict, retry_after_429: bool = True) -> requests.Response | None:
+    try:
+        resp = requests.post(_ENDPOINT, json=payload, timeout=15)
+        if resp.status_code == 429 and retry_after_429:
             wait = int(resp.headers.get("Retry-After", 60))
             time.sleep(wait)
-            limiter.acquire()
-            resp = requests.post(
-                _ENDPOINT,
-                json={"query": _QUERY, "variables": {"search": search}},
-                timeout=10,
-            )
-
-        if resp.status_code != 200:
-            return None
-
-        data = resp.json().get("data", {}).get("Media")
-        if not data:
-            return None
-
-        title = data.get("title", {})
-        return {
-            "id": data["id"],
-            "title_romaji": title.get("romaji"),
-            "title_english": title.get("english"),
-            "title_native": title.get("native"),
-            "genres": data.get("genres", []),
-            "score": data.get("averageScore"),
-            "episodes": data.get("episodes"),
-            "year": data.get("seasonYear"),
-            "status": data.get("status"),
-            "format": data.get("format"),
-        }
+            resp = requests.post(_ENDPOINT, json=payload, timeout=15)
+        return resp
     except requests.RequestException:
         return None
+
+
+def _query_batch(searches: list[str]) -> dict[str, dict | None]:
+    """Send one GraphQL request for multiple shows using aliases."""
+    # Build aliased query: s0: Media(search: "...") { ... }
+    aliases = [f's{i}: Media(search: {json.dumps(s)}, type: ANIME) {{ {_MEDIA_FIELDS} }}'
+               for i, s in enumerate(searches)]
+    query = "query {\n" + "\n".join(aliases) + "\n}"
+
+    resp = _do_request({"query": query})
+    if resp is None or resp.status_code != 200:
+        return {s: None for s in searches}
+
+    data = resp.json().get("data") or {}
+    results: dict[str, dict | None] = {}
+    for i, search in enumerate(searches):
+        raw = data.get(f"s{i}")
+        results[search] = _parse_media(raw) if raw else None
+    return results
 
 
 def prefetch_all(
     show_names: list[str],
     cache: dict,
     cache_path: Path,
-    limiter: RateLimiter,
     *,
-    workers: int = 4,
+    batch_size: int = 50,
+    rate: float = 1.0,
     on_done: Callable[[str, dict | None, bool], None] | None = None,
 ) -> dict[str, dict | None]:
-    """Fetch AniList metadata for all shows concurrently, respecting the rate limit."""
-    cache_lock = threading.Lock()
+    """Fetch AniList metadata for all shows, batching multiple shows per request."""
     out: dict[str, dict | None] = {}
+    interval = 1.0 / rate
 
-    def _fetch(name: str) -> tuple[str, dict | None]:
+    # Separate cache hits from shows that need fetching
+    uncached: list[str] = []
+    for name in show_names:
         key = name.lower().strip()
+        if key in cache:
+            out[name] = cache[key]
+            if on_done:
+                on_done(name, cache[key], True)
+        else:
+            uncached.append(name)
 
-        with cache_lock:
-            if key in cache:
-                meta = cache[key]
-                if on_done:
-                    on_done(name, meta, True)
-                return name, meta
+    # Process uncached shows in batches
+    for batch_start in range(0, len(uncached), batch_size):
+        batch = uncached[batch_start: batch_start + batch_size]
+        t0 = time.time()
 
-        meta = _query_anilist(name, limiter)
-        if meta is None:
-            cleaned = _clean_name(name)
-            if cleaned and cleaned.lower() != key:
-                meta = _query_anilist(cleaned, limiter)
+        results = _query_batch(batch)
 
-        with cache_lock:
+        # For any that came back None, retry once with cleaned name
+        retries: list[str] = []
+        retry_originals: dict[str, str] = {}
+        for name, meta in results.items():
+            if meta is None:
+                cleaned = _clean_name(name)
+                if cleaned and cleaned.lower() != name.lower().strip():
+                    retries.append(cleaned)
+                    retry_originals[cleaned] = name
+
+        if retries:
+            # Wait out the rate limit before retry batch
+            elapsed = time.time() - t0
+            if elapsed < interval:
+                time.sleep(interval - elapsed)
+            t0 = time.time()
+            retry_results = _query_batch(retries)
+            for cleaned, meta in retry_results.items():
+                original = retry_originals[cleaned]
+                if meta is not None:
+                    results[original] = meta
+
+        # Store results
+        for name, meta in results.items():
+            key = name.lower().strip()
             cache[key] = meta
-            save_cache(cache, cache_path)
-
-        if on_done:
-            on_done(name, meta, False)
-        return name, meta
-
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        for name, meta in pool.map(_fetch, show_names):
             out[name] = meta
+            if on_done:
+                on_done(name, meta, False)
+
+        save_cache(cache, cache_path)
+
+        # Rate limit between batches
+        elapsed = time.time() - t0
+        if elapsed < interval and batch_start + batch_size < len(uncached):
+            time.sleep(interval - elapsed)
 
     return out

@@ -115,12 +115,12 @@ def main():
         help="Skip shows with fewer than N parsed episodes"
     )
     parser.add_argument(
-        "--anilist-workers", type=int, default=4, metavar="N",
-        help="Parallel workers for AniList fetches (default: 4)",
+        "--anilist-batch", type=int, default=50, metavar="N",
+        help="Shows per AniList request (default: 50)",
     )
     parser.add_argument(
         "--anilist-rate", type=float, default=1.0, metavar="RPS",
-        help="AniList requests per second (default: 1.0)",
+        help="AniList batch requests per second (default: 1.0)",
     )
     args = parser.parse_args()
 
@@ -141,9 +141,12 @@ def main():
     cache_path = Path(args.cache)
     cache = anilist.load_cache(cache_path)
     cache_hits_initial = sum(1 for name in shows if name.lower().strip() in cache)
+    uncached_count = len(shows) - cache_hits_initial
+    n_batches = -(-uncached_count // args.anilist_batch)  # ceiling div
     console.log(
         f"AniList cache: [green]{cache_hits_initial}[/green] hits, "
-        f"[yellow]{len(shows) - cache_hits_initial}[/yellow] need fetching "
+        f"[yellow]{uncached_count}[/yellow] need fetching "
+        f"→ [bold]{n_batches}[/bold] batch request(s) "
         f"([dim]{cache_path.name}[/dim])"
     )
 
@@ -157,8 +160,6 @@ def main():
     anilist_executor: ThreadPoolExecutor | None = None
 
     if not args.no_anilist:
-        limiter = anilist.RateLimiter(rate=args.anilist_rate)
-
         def _on_anilist_done(name: str, meta: dict | None, hit: bool) -> None:
             anilist_stats["done"] += 1
             if hit:
@@ -180,16 +181,17 @@ def main():
         anilist_executor = ThreadPoolExecutor(max_workers=1)
         console.log(
             f"Starting AniList prefetch in background "
-            f"([bold]{args.anilist_workers}[/bold] workers, "
-            f"[bold]{args.anilist_rate}[/bold] req/s)"
+            f"(batch_size=[bold]{args.anilist_batch}[/bold], "
+            f"rate=[bold]{args.anilist_rate}[/bold] req/s → "
+            f"~[bold]{args.anilist_batch * args.anilist_rate:.0f}[/bold] shows/s)"
         )
         anilist_future = anilist_executor.submit(
             anilist.prefetch_all,
             list(shows.keys()),
             cache,
             cache_path,
-            limiter,
-            workers=args.anilist_workers,
+            batch_size=args.anilist_batch,
+            rate=args.anilist_rate,
             on_done=_on_anilist_done,
         )
 
