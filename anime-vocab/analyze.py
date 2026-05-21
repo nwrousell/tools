@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 import argparse
-import json
+import csv
 import time
-from concurrent.futures import ThreadPoolExecutor, Future
 from itertools import islice
 from pathlib import Path
 
@@ -19,38 +18,53 @@ console = Console()
 DEFAULT_TOP_K = [100, 500, 1000, 2000, 3000, 5000]
 DEFAULT_DATA_DIR = Path(__file__).parent / "data" / "subtitles" / "anime_tv"
 
-
-def _sort_key(result: dict, field: str) -> tuple:
-    meta = result.get("metadata") or {}
-    stats = result.get("stats") or {}
-    has_meta = meta is not None
-
-    if field == "score":
-        val = meta.get("score") if has_meta else None
-    elif field == "unique_vocab":
-        val = stats.get("unique_lemmas")
-    elif field == "words_per_episode":
-        val = stats.get("tokens_per_episode")
-    else:
-        val = None
-
-    return (0 if val is not None else 1, -(val or 0))
+_STATS_COLS = [
+    "show", "episodes", "total_tokens", "unique_lemmas",
+    "content_tokens", "unique_content_lemmas", "tokens_per_ep", "unique_per_ep",
+]
+_META_COLS = [
+    "anilist_id", "title_romaji", "title_english", "genres",
+    "score", "episodes_listed", "year", "status", "format",
+]
 
 
-def _matches_genre(result: dict, genre: str) -> bool:
-    meta = result.get("metadata") or {}
-    genres = meta.get("genres") or []
-    return any(genre.lower() in g.lower() for g in genres)
+def _cov_cols(top_k: list[int]) -> list[str]:
+    return [f"cov_{k}" for k in top_k]
 
 
-def _display_name(result: dict) -> str:
-    meta = result.get("metadata") or {}
-    return meta.get("title_romaji") or meta.get("title_english") or result["show_folder"]
+def _read_csv(path: Path) -> tuple[list[dict], list[int]]:
+    with path.open(newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    top_k = sorted(int(c[4:]) for c in (rows[0] if rows else {}) if c.startswith("cov_"))
+    return rows, top_k
 
 
-def build_table(results: list[dict], sort: str, genre: str | None) -> Table:
-    filtered = results if not genre else [r for r in results if _matches_genre(r, genre)]
-    sorted_results = sorted(filtered, key=lambda r: _sort_key(r, sort))
+def _write_csv(path: Path, rows: list[dict], fieldnames: list[str]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(rows)
+
+
+def _build_table(rows: list[dict], sort: str, genre: str | None, top_k: list[int]) -> Table:
+    cov_col = f"cov_{1000}" if 1000 in top_k else (f"cov_{top_k[-1]}" if top_k else None)
+
+    def sort_key(r: dict) -> tuple:
+        if sort == "score":
+            raw = r.get("score")
+        elif sort == "unique_vocab":
+            raw = r.get("unique_lemmas")
+        else:
+            raw = r.get("tokens_per_ep")
+        try:
+            val = float(raw) if raw not in (None, "") else None
+        except (ValueError, TypeError):
+            val = None
+        return (0 if val is not None else 1, -(val or 0))
+
+    if genre:
+        rows = [r for r in rows if genre.lower() in (r.get("genres") or "").lower()]
+    rows = sorted(rows, key=sort_key)
 
     table = Table(show_header=True, header_style="bold cyan")
     table.add_column("Show", min_width=24)
@@ -60,70 +74,33 @@ def build_table(results: list[dict], sort: str, genre: str | None) -> Table:
     table.add_column("Eps\n(parsed)", justify="right")
     table.add_column("Unique\nVocab", justify="right")
     table.add_column("Tokens\n/Episode", justify="right")
-    table.add_column("Top-1000\nCoverage", justify="right")
+    if cov_col:
+        k_label = cov_col.split("_")[1]
+        table.add_column(f"Top-{k_label}\nCoverage", justify="right")
 
-    for r in sorted_results:
-        meta = r.get("metadata") or {}
-        stats = r["stats"]
-        cov = stats.get("top_k_coverage", {}).get("1000")
-        table.add_row(
-            _display_name(r),
-            str(meta.get("year") or "?"),
-            ", ".join((meta.get("genres") or [])[:3]) or "?",
-            str(meta.get("score") or "?"),
-            f"{stats.get('episode_count_parsed', 0)}",
-            f"{stats.get('unique_lemmas', 0):,}",
-            f"{stats.get('tokens_per_episode', 0):,.0f}",
-            f"{cov*100:.1f}%" if cov is not None else "?",
-        )
+    for r in rows:
+        name = r.get("title_romaji") or r.get("title_english") or r["show"]
+        try:
+            cov_str = f"{float(r[cov_col]) * 100:.1f}%" if cov_col and r.get(cov_col) else "?"
+        except (ValueError, TypeError):
+            cov_str = "?"
+        row_data = [
+            name,
+            str(r.get("year") or "?"),
+            (r.get("genres") or "?").replace(";", ", "),
+            str(r.get("score") or "?"),
+            str(r.get("episodes") or "?"),
+            f"{int(r.get('unique_lemmas') or 0):,}",
+            f"{float(r.get('tokens_per_ep') or 0):,.0f}",
+        ]
+        if cov_col:
+            row_data.append(cov_str)
+        table.add_row(*row_data)
 
     return table
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Compute Japanese vocabulary statistics for anime from subtitle files."
-    )
-    parser.add_argument(
-        "subtitles_dir",
-        nargs="?",
-        default=str(DEFAULT_DATA_DIR),
-        help="Path to kitsunekko-organized subtitle root (default: ./data)",
-    )
-    parser.add_argument("--output", default="results.json", help="JSON output path")
-    parser.add_argument(
-        "--cache", default=str(Path(__file__).parent / "cache.json"), help="AniList cache file"
-    )
-    parser.add_argument(
-        "--sort",
-        choices=["score", "unique_vocab", "words_per_episode"],
-        default="score",
-    )
-    parser.add_argument("--genre", help="Filter table by genre (case-insensitive substring)")
-    parser.add_argument(
-        "--top-k",
-        nargs="+",
-        type=int,
-        default=DEFAULT_TOP_K,
-        metavar="K",
-        help="Coverage thresholds",
-    )
-    parser.add_argument("--no-anilist", action="store_true", help="Skip AniList lookups")
-    parser.add_argument("--limit", type=int, help="Process only first N shows")
-    parser.add_argument(
-        "--min-episodes", type=int, default=1, metavar="N",
-        help="Skip shows with fewer than N parsed episodes"
-    )
-    parser.add_argument(
-        "--anilist-batch", type=int, default=50, metavar="N",
-        help="Shows per AniList request (default: 50)",
-    )
-    parser.add_argument(
-        "--anilist-rate", type=float, default=1.0, metavar="RPS",
-        help="AniList batch requests per second (default: 1.0)",
-    )
-    args = parser.parse_args()
-
+def cmd_process(args) -> None:
     t_start = time.time()
 
     subs_dir = Path(args.subtitles_dir)
@@ -138,70 +115,14 @@ def main():
         shows = dict(islice(shows.items(), args.limit))
     console.log(f"Found [bold]{len(shows)}[/bold] shows")
 
-    cache_path = Path(args.cache)
-    cache = anilist.load_cache(cache_path)
-    cache_hits_initial = sum(1 for name in shows if name.lower().strip() in cache)
-    uncached_count = len(shows) - cache_hits_initial
-    n_batches = -(-uncached_count // args.anilist_batch)  # ceiling div
-    console.log(
-        f"AniList cache: [green]{cache_hits_initial}[/green] hits, "
-        f"[yellow]{uncached_count}[/yellow] need fetching "
-        f"→ [bold]{n_batches}[/bold] batch request(s) "
-        f"([dim]{cache_path.name}[/dim])"
-    )
-
     tagger = tokenizer.build_tagger()
     console.log("MeCab tagger initialized")
+    console.log(f"Tokenizing [bold]{len(shows)}[/bold] shows...")
 
-    # --- AniList prefetch (runs concurrently with tokenization) ---
-    anilist_future: Future | None = None
-    anilist_results: dict[str, dict | None] = {}
-    anilist_stats = {"done": 0, "hits": 0, "misses": 0, "unmatched": 0}
-    anilist_executor: ThreadPoolExecutor | None = None
-
-    if not args.no_anilist:
-        def _on_anilist_done(name: str, meta: dict | None, hit: bool) -> None:
-            anilist_stats["done"] += 1
-            if hit:
-                anilist_stats["hits"] += 1
-            else:
-                anilist_stats["misses"] += 1
-            if meta is None:
-                anilist_stats["unmatched"] += 1
-            n = anilist_stats["done"]
-            total = len(shows)
-            if n % 100 == 0 or n == total:
-                console.log(
-                    f"AniList: [cyan]{n}/{total}[/cyan] "
-                    f"({anilist_stats['hits']} cached, "
-                    f"{anilist_stats['misses']} fetched, "
-                    f"{anilist_stats['unmatched']} unmatched)"
-                )
-
-        anilist_executor = ThreadPoolExecutor(max_workers=1)
-        console.log(
-            f"Starting AniList prefetch in background "
-            f"(batch_size=[bold]{args.anilist_batch}[/bold], "
-            f"rate=[bold]{args.anilist_rate}[/bold] req/s → "
-            f"~[bold]{args.anilist_batch * args.anilist_rate:.0f}[/bold] shows/s)"
-        )
-        anilist_future = anilist_executor.submit(
-            anilist.prefetch_all,
-            list(shows.keys()),
-            cache,
-            cache_path,
-            batch_size=args.anilist_batch,
-            rate=args.anilist_rate,
-            on_done=_on_anilist_done,
-        )
-
-    # --- Tokenization ---
-    results = []
+    rows = []
     skipped = 0
     total_tokens = 0
-    t_tok_start = time.time()
-
-    console.log(f"Tokenizing [bold]{len(shows)}[/bold] shows...")
+    t_tok = time.time()
 
     with Progress(
         SpinnerColumn(),
@@ -225,67 +146,142 @@ def main():
                 continue
 
             total_tokens += stats["total_tokens"]
-            results.append({"show_folder": show_name, "stats": stats})
+            row = {
+                "show": show_name,
+                "episodes": stats["episode_count_parsed"],
+                "total_tokens": stats["total_tokens"],
+                "unique_lemmas": stats["unique_lemmas"],
+                "content_tokens": stats["content_tokens"],
+                "unique_content_lemmas": stats["unique_content_lemmas"],
+                "tokens_per_ep": stats["tokens_per_episode"],
+                "unique_per_ep": stats["unique_per_episode"],
+            }
+            for k in args.top_k:
+                row[f"cov_{k}"] = stats["top_k_coverage"].get(str(k), "")
+            rows.append(row)
             progress.advance(task)
 
             if i % 500 == 0 or i == len(shows):
-                elapsed = time.time() - t_tok_start
-                rate = i / elapsed if elapsed > 0 else 0
+                elapsed = time.time() - t_tok
                 console.log(
-                    f"Tokenized [cyan]{i}/{len(shows)}[/cyan] shows "
-                    f"| {rate:.1f} shows/s "
-                    f"| {total_tokens:,} tokens so far"
-                    + (f" | skipped {skipped}" if skipped else "")
+                    f"Tokenized [cyan]{i}/{len(shows)}[/cyan] "
+                    f"| {i/elapsed:.1f} shows/s "
+                    f"| {total_tokens:,} tokens"
+                    + (f" | {skipped} skipped" if skipped else "")
                 )
 
-    t_tok_end = time.time()
-    tok_elapsed = t_tok_end - t_tok_start
+    elapsed = time.time() - t_tok
     console.log(
-        f"Tokenization complete: [bold]{len(results)}[/bold] shows kept, "
-        f"{skipped} skipped, "
-        f"{total_tokens:,} total tokens "
-        f"in [bold]{tok_elapsed:.1f}s[/bold] "
-        f"({len(results)/tok_elapsed:.1f} shows/s)"
+        f"Done: [bold]{len(rows)}[/bold] shows, {skipped} skipped, "
+        f"{total_tokens:,} tokens in [bold]{elapsed:.1f}s[/bold] ({len(rows)/elapsed:.1f} shows/s)"
     )
 
-    # --- Wait for AniList ---
-    if anilist_future is not None:
-        if not anilist_future.done():
-            console.log("Waiting for AniList prefetch to finish...")
-        anilist_results = anilist_future.result()
-        anilist_executor.shutdown(wait=False)
-        console.log(
-            f"AniList complete: "
-            f"[green]{anilist_stats['hits']}[/green] cached, "
-            f"[yellow]{anilist_stats['misses']}[/yellow] fetched, "
-            f"[red]{anilist_stats['unmatched']}[/red] unmatched"
-        )
-
-    # Merge metadata into results
-    unmatched_names = []
-    for r in results:
-        meta = anilist_results.get(r["show_folder"]) if not args.no_anilist else None
-        r["metadata"] = meta
-        if not args.no_anilist and meta is None:
-            unmatched_names.append(r["show_folder"])
-
-    # --- Write output ---
     output_path = Path(args.output)
-    output_path.write_text(
-        json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8"
+    _write_csv(output_path, rows, _STATS_COLS + _cov_cols(args.top_k))
+    console.log(f"Wrote [bold]{output_path}[/bold] ({len(rows)} rows, {output_path.stat().st_size // 1024} KB)")
+    console.log(f"Total: [bold]{time.time() - t_start:.1f}s[/bold]")
+
+
+def cmd_enrich(args) -> None:
+    t_start = time.time()
+
+    input_path = Path(args.input)
+    if not input_path.exists():
+        console.print(f"[red]Not found: {input_path}[/red]")
+        raise SystemExit(1)
+
+    rows, top_k = _read_csv(input_path)
+    console.log(f"Loaded [bold]{len(rows)}[/bold] shows from [bold]{input_path}[/bold]")
+
+    cache_path = Path(args.cache)
+    cache = anilist.load_cache(cache_path)
+    show_names = [r["show"] for r in rows]
+    n_cached = sum(1 for n in show_names if n.lower().strip() in cache)
+    n_uncached = len(show_names) - n_cached
+    n_batches = -(-n_uncached // args.batch_size)
+    console.log(
+        f"AniList cache: [green]{n_cached}[/green] hits, "
+        f"[yellow]{n_uncached}[/yellow] to fetch "
+        f"→ [bold]{n_batches}[/bold] batch request(s) "
+        f"(~{n_batches / args.rate:.0f}s at {args.rate} req/s)"
     )
-    console.log(f"Results written to [bold]{output_path}[/bold] ({len(results)} shows)")
 
-    table = build_table(results, args.sort, args.genre)
-    console.print(table)
+    stats = {"done": 0, "hits": 0, "fetched": 0, "unmatched": 0}
 
-    if unmatched_names:
-        console.log(f"[yellow]{len(unmatched_names)} show(s) had no AniList match[/yellow]")
-        for name in unmatched_names:
-            console.print(f"  • {name}")
+    def _on_done(name: str, meta: dict | None, hit: bool) -> None:
+        stats["done"] += 1
+        if hit:
+            stats["hits"] += 1
+        else:
+            stats["fetched"] += 1
+        if meta is None:
+            stats["unmatched"] += 1
+        n = stats["done"]
+        if n % 200 == 0 or n == len(rows):
+            console.log(
+                f"AniList [cyan]{n}/{len(rows)}[/cyan] "
+                f"— {stats['hits']} cached, {stats['fetched']} fetched, "
+                f"{stats['unmatched']} unmatched"
+            )
 
-    total_elapsed = time.time() - t_start
-    console.log(f"Done in [bold]{total_elapsed:.1f}s[/bold] total")
+    console.log(f"Querying AniList (batch_size={args.batch_size}, rate={args.rate} req/s)...")
+    anilist_results = anilist.prefetch_all(
+        show_names, cache, cache_path,
+        batch_size=args.batch_size,
+        rate=args.rate,
+        on_done=_on_done,
+    )
+    console.log(
+        f"AniList complete — "
+        f"[green]{stats['hits']}[/green] cached, "
+        f"[yellow]{stats['fetched']}[/yellow] fetched, "
+        f"[red]{stats['unmatched']}[/red] unmatched"
+    )
+
+    for row in rows:
+        meta = anilist_results.get(row["show"]) or {}
+        row["anilist_id"] = meta.get("id", "")
+        row["title_romaji"] = meta.get("title_romaji", "")
+        row["title_english"] = meta.get("title_english", "")
+        row["genres"] = ";".join(meta.get("genres") or [])
+        row["score"] = meta.get("score", "")
+        row["episodes_listed"] = meta.get("episodes", "")
+        row["year"] = meta.get("year", "")
+        row["status"] = meta.get("status", "")
+        row["format"] = meta.get("format", "")
+
+    output_path = Path(args.output)
+    _write_csv(output_path, rows, _STATS_COLS + _cov_cols(top_k) + _META_COLS)
+    console.log(f"Wrote [bold]{output_path}[/bold]")
+
+    console.print(_build_table(rows, args.sort, args.genre, top_k))
+    console.log(f"Total: [bold]{time.time() - t_start:.1f}s[/bold]")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Japanese vocabulary analysis from anime subtitles."
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("process", help="Tokenize subtitles → stats.csv")
+    p.add_argument("subtitles_dir", nargs="?", default=str(DEFAULT_DATA_DIR))
+    p.add_argument("--output", default="stats.csv")
+    p.add_argument("--top-k", nargs="+", type=int, default=DEFAULT_TOP_K, metavar="K")
+    p.add_argument("--limit", type=int)
+    p.add_argument("--min-episodes", type=int, default=1, metavar="N")
+
+    e = sub.add_parser("enrich", help="Add AniList metadata to a stats CSV")
+    e.add_argument("input", help="CSV produced by the process command")
+    e.add_argument("--output", default="enriched.csv")
+    e.add_argument("--cache", default=str(Path(__file__).parent / "cache.json"))
+    e.add_argument("--batch-size", type=int, default=50, metavar="N")
+    e.add_argument("--rate", type=float, default=1.0, metavar="RPS")
+    e.add_argument("--sort", choices=["score", "unique_vocab", "words_per_episode"], default="score")
+    e.add_argument("--genre")
+
+    args = parser.parse_args()
+    {"process": cmd_process, "enrich": cmd_enrich}[args.command](args)
 
 
 if __name__ == "__main__":
