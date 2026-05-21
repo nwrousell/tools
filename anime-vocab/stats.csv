@@ -1,0 +1,4 @@
+show,episodes,total_tokens,unique_lemmas,content_tokens,unique_content_lemmas,tokens_per_ep,unique_per_ep,cov_100,cov_500,cov_1000,cov_2000,cov_3000,cov_5000
+07-Ghost,58,130984,3985,71264,3829,2258.3,68.7,0.641513,0.837682,0.910508,0.962377,0.985036,1.0
+100-man no Inochi no Ue ni Ore wa Tatteiru,20,64398,3340,33462,3195,3219.9,167.0,0.636215,0.802137,0.896068,0.968136,0.99472,1.0
+100-man no Inochi no Ue ni Ore wa Tatteiru 2nd Season,12,45080,3599,23902,3454,3756.7,299.9,0.608651,0.778682,0.890106,0.962378,0.986713,1.0
