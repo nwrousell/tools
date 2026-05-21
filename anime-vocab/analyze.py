@@ -111,9 +111,15 @@ def cmd_process(args) -> None:
 
     console.log(f"Discovering shows in [bold]{subs_dir}[/bold]")
     shows = subtitles.discover_shows(subs_dir)
-    if args.limit:
+    if args.show:
+        needle = args.show.lower()
+        shows = {k: v for k, v in shows.items() if needle in k.lower()}
+        if not shows:
+            console.print(f"[red]No show matching '{args.show}' found in {subs_dir}[/red]")
+            raise SystemExit(1)
+    elif args.limit:
         shows = dict(islice(shows.items(), args.limit))
-    console.log(f"Found [bold]{len(shows)}[/bold] shows")
+    console.log(f"Found [bold]{len(shows)}[/bold] show(s)")
 
     tagger = tokenizer.build_tagger()
     console.log("MeCab tagger initialized")
@@ -268,6 +274,7 @@ def main():
     p.add_argument("subtitles_dir", nargs="?", default=str(DEFAULT_DATA_DIR))
     p.add_argument("--output", default="stats.csv")
     p.add_argument("--top-k", nargs="+", type=int, default=DEFAULT_TOP_K, metavar="K")
+    p.add_argument("--show", metavar="NAME", help="Process only shows whose folder name contains NAME")
     p.add_argument("--limit", type=int)
     p.add_argument("--min-episodes", type=int, default=1, metavar="N")
 
