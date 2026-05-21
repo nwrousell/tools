@@ -1,7 +1,10 @@
 import json
 import re
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Callable
 
 import requests
 
@@ -25,6 +28,20 @@ query ($search: String) {
 _SEASON_STRIP = re.compile(r"[\[【(].*?[\]】)]|\s+\d+期$|\s+Season\s+\d+$", re.IGNORECASE)
 
 
+class RateLimiter:
+    def __init__(self, rate: float = 1.0):
+        self._lock = threading.Lock()
+        self._interval = 1.0 / rate
+        self._last = 0.0
+
+    def acquire(self) -> None:
+        with self._lock:
+            wait = self._interval - (time.time() - self._last)
+            if wait > 0:
+                time.sleep(wait)
+            self._last = time.time()
+
+
 def load_cache(path: Path) -> dict:
     if path.exists():
         try:
@@ -44,28 +61,24 @@ def _clean_name(name: str) -> str:
     return _SEASON_STRIP.sub("", name).strip()
 
 
-def _query_anilist(search: str, last_req: list[float]) -> dict | None:
-    elapsed = time.time() - last_req[0]
-    if elapsed < 1.0:
-        time.sleep(1.0 - elapsed)
-
+def _query_anilist(search: str, limiter: RateLimiter) -> dict | None:
+    limiter.acquire()
     try:
         resp = requests.post(
             _ENDPOINT,
             json={"query": _QUERY, "variables": {"search": search}},
             timeout=10,
         )
-        last_req[0] = time.time()
 
         if resp.status_code == 429:
             wait = int(resp.headers.get("Retry-After", 60))
             time.sleep(wait)
+            limiter.acquire()
             resp = requests.post(
                 _ENDPOINT,
                 json={"query": _QUERY, "variables": {"search": search}},
                 timeout=10,
             )
-            last_req[0] = time.time()
 
         if resp.status_code != 200:
             return None
@@ -91,24 +104,45 @@ def _query_anilist(search: str, last_req: list[float]) -> dict | None:
         return None
 
 
-def fetch_metadata(
-    folder_name: str,
+def prefetch_all(
+    show_names: list[str],
     cache: dict,
     cache_path: Path,
-    last_req: list[float],
-) -> dict | None:
-    key = folder_name.lower().strip()
-    if key in cache:
-        return cache[key]
+    limiter: RateLimiter,
+    *,
+    workers: int = 4,
+    on_done: Callable[[str, dict | None, bool], None] | None = None,
+) -> dict[str, dict | None]:
+    """Fetch AniList metadata for all shows concurrently, respecting the rate limit."""
+    cache_lock = threading.Lock()
+    out: dict[str, dict | None] = {}
 
-    result = _query_anilist(folder_name, last_req)
+    def _fetch(name: str) -> tuple[str, dict | None]:
+        key = name.lower().strip()
 
-    # retry with cleaned name if no match
-    if result is None:
-        cleaned = _clean_name(folder_name)
-        if cleaned and cleaned.lower() != key:
-            result = _query_anilist(cleaned, last_req)
+        with cache_lock:
+            if key in cache:
+                meta = cache[key]
+                if on_done:
+                    on_done(name, meta, True)
+                return name, meta
 
-    cache[key] = result
-    save_cache(cache, cache_path)
-    return result
+        meta = _query_anilist(name, limiter)
+        if meta is None:
+            cleaned = _clean_name(name)
+            if cleaned and cleaned.lower() != key:
+                meta = _query_anilist(cleaned, limiter)
+
+        with cache_lock:
+            cache[key] = meta
+            save_cache(cache, cache_path)
+
+        if on_done:
+            on_done(name, meta, False)
+        return name, meta
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for name, meta in pool.map(_fetch, show_names):
+            out[name] = meta
+
+    return out

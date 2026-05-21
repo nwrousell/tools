@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import time
+from concurrent.futures import ThreadPoolExecutor, Future
 from itertools import islice
 from pathlib import Path
 
@@ -112,7 +114,17 @@ def main():
         "--min-episodes", type=int, default=1, metavar="N",
         help="Skip shows with fewer than N parsed episodes"
     )
+    parser.add_argument(
+        "--anilist-workers", type=int, default=4, metavar="N",
+        help="Parallel workers for AniList fetches (default: 4)",
+    )
+    parser.add_argument(
+        "--anilist-rate", type=float, default=1.0, metavar="RPS",
+        help="AniList requests per second (default: 1.0)",
+    )
     args = parser.parse_args()
+
+    t_start = time.time()
 
     subs_dir = Path(args.subtitles_dir)
     if not subs_dir.exists():
@@ -120,20 +132,74 @@ def main():
         console.print("Run [bold]make setup[/bold] to clone the kitsunekko archive.")
         raise SystemExit(1)
 
-    console.print(f"[bold]Discovering shows in[/bold] {subs_dir}")
+    console.log(f"Discovering shows in [bold]{subs_dir}[/bold]")
     shows = subtitles.discover_shows(subs_dir)
     if args.limit:
         shows = dict(islice(shows.items(), args.limit))
-    console.print(f"Found [bold]{len(shows)}[/bold] shows")
+    console.log(f"Found [bold]{len(shows)}[/bold] shows")
 
     cache_path = Path(args.cache)
     cache = anilist.load_cache(cache_path)
-    last_req: list[float] = [0.0]
+    cache_hits_initial = sum(1 for name in shows if name.lower().strip() in cache)
+    console.log(
+        f"AniList cache: [green]{cache_hits_initial}[/green] hits, "
+        f"[yellow]{len(shows) - cache_hits_initial}[/yellow] need fetching "
+        f"([dim]{cache_path.name}[/dim])"
+    )
 
     tagger = tokenizer.build_tagger()
+    console.log("MeCab tagger initialized")
 
+    # --- AniList prefetch (runs concurrently with tokenization) ---
+    anilist_future: Future | None = None
+    anilist_results: dict[str, dict | None] = {}
+    anilist_stats = {"done": 0, "hits": 0, "misses": 0, "unmatched": 0}
+    anilist_executor: ThreadPoolExecutor | None = None
+
+    if not args.no_anilist:
+        limiter = anilist.RateLimiter(rate=args.anilist_rate)
+
+        def _on_anilist_done(name: str, meta: dict | None, hit: bool) -> None:
+            anilist_stats["done"] += 1
+            if hit:
+                anilist_stats["hits"] += 1
+            else:
+                anilist_stats["misses"] += 1
+            if meta is None:
+                anilist_stats["unmatched"] += 1
+            n = anilist_stats["done"]
+            total = len(shows)
+            if n % 100 == 0 or n == total:
+                console.log(
+                    f"AniList: [cyan]{n}/{total}[/cyan] "
+                    f"({anilist_stats['hits']} cached, "
+                    f"{anilist_stats['misses']} fetched, "
+                    f"{anilist_stats['unmatched']} unmatched)"
+                )
+
+        anilist_executor = ThreadPoolExecutor(max_workers=1)
+        console.log(
+            f"Starting AniList prefetch in background "
+            f"([bold]{args.anilist_workers}[/bold] workers, "
+            f"[bold]{args.anilist_rate}[/bold] req/s)"
+        )
+        anilist_future = anilist_executor.submit(
+            anilist.prefetch_all,
+            list(shows.keys()),
+            cache,
+            cache_path,
+            limiter,
+            workers=args.anilist_workers,
+            on_done=_on_anilist_done,
+        )
+
+    # --- Tokenization ---
     results = []
-    unmatched = []
+    skipped = 0
+    total_tokens = 0
+    t_tok_start = time.time()
+
+    console.log(f"Tokenizing [bold]{len(shows)}[/bold] shows...")
 
     with Progress(
         SpinnerColumn(),
@@ -142,9 +208,9 @@ def main():
         TaskProgressColumn(),
         console=console,
     ) as progress:
-        task = progress.add_task("Processing shows...", total=len(shows))
+        task = progress.add_task("Tokenizing...", total=len(shows))
 
-        for show_name, episode_paths in shows.items():
+        for i, (show_name, episode_paths) in enumerate(shows.items(), 1):
             progress.update(task, description=f"[cyan]{show_name[:40]}[/cyan]")
 
             episode_texts = [subtitles.extract_text(p) for p in episode_paths]
@@ -152,34 +218,72 @@ def main():
             stats = tokenizer.compute_show_stats(episode_token_lists, top_k=args.top_k)
 
             if stats["episode_count_parsed"] < args.min_episodes:
+                skipped += 1
                 progress.advance(task)
                 continue
 
-            metadata = None
-            if not args.no_anilist:
-                metadata = anilist.fetch_metadata(show_name, cache, cache_path, last_req)
-                if metadata is None:
-                    unmatched.append(show_name)
-
-            results.append({"show_folder": show_name, "metadata": metadata, "stats": stats})
+            total_tokens += stats["total_tokens"]
+            results.append({"show_folder": show_name, "stats": stats})
             progress.advance(task)
 
-    # write JSON (exclude freq_dist from summary, keep it full in the file)
+            if i % 500 == 0 or i == len(shows):
+                elapsed = time.time() - t_tok_start
+                rate = i / elapsed if elapsed > 0 else 0
+                console.log(
+                    f"Tokenized [cyan]{i}/{len(shows)}[/cyan] shows "
+                    f"| {rate:.1f} shows/s "
+                    f"| {total_tokens:,} tokens so far"
+                    + (f" | skipped {skipped}" if skipped else "")
+                )
+
+    t_tok_end = time.time()
+    tok_elapsed = t_tok_end - t_tok_start
+    console.log(
+        f"Tokenization complete: [bold]{len(results)}[/bold] shows kept, "
+        f"{skipped} skipped, "
+        f"{total_tokens:,} total tokens "
+        f"in [bold]{tok_elapsed:.1f}s[/bold] "
+        f"({len(results)/tok_elapsed:.1f} shows/s)"
+    )
+
+    # --- Wait for AniList ---
+    if anilist_future is not None:
+        if not anilist_future.done():
+            console.log("Waiting for AniList prefetch to finish...")
+        anilist_results = anilist_future.result()
+        anilist_executor.shutdown(wait=False)
+        console.log(
+            f"AniList complete: "
+            f"[green]{anilist_stats['hits']}[/green] cached, "
+            f"[yellow]{anilist_stats['misses']}[/yellow] fetched, "
+            f"[red]{anilist_stats['unmatched']}[/red] unmatched"
+        )
+
+    # Merge metadata into results
+    unmatched_names = []
+    for r in results:
+        meta = anilist_results.get(r["show_folder"]) if not args.no_anilist else None
+        r["metadata"] = meta
+        if not args.no_anilist and meta is None:
+            unmatched_names.append(r["show_folder"])
+
+    # --- Write output ---
     output_path = Path(args.output)
     output_path.write_text(
         json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    console.print(f"\n[green]Results written to[/green] {output_path}")
+    console.log(f"Results written to [bold]{output_path}[/bold] ({len(results)} shows)")
 
     table = build_table(results, args.sort, args.genre)
     console.print(table)
 
-    if unmatched:
-        console.print(
-            f"\n[yellow][WARN] {len(unmatched)} show(s) had no AniList match:[/yellow]"
-        )
-        for name in unmatched:
+    if unmatched_names:
+        console.log(f"[yellow]{len(unmatched_names)} show(s) had no AniList match[/yellow]")
+        for name in unmatched_names:
             console.print(f"  • {name}")
+
+    total_elapsed = time.time() - t_start
+    console.log(f"Done in [bold]{total_elapsed:.1f}s[/bold] total")
 
 
 if __name__ == "__main__":
