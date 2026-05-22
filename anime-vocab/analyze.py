@@ -9,6 +9,11 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.table import Table
 
+import tempfile
+import urllib.parse
+
+import requests
+
 import anilist
 import subtitles
 import tokenizer
@@ -98,6 +103,93 @@ def _build_table(rows: list[dict], sort: str, genre: str | None, top_k: list[int
         table.add_row(*row_data)
 
     return table
+
+
+_KITSUNEKKO_REPO = "Ajatt-Tools/kitsunekko-archive-2026"
+_GITHUB_API = "https://api.github.com"
+_SUB_EXTS = {".srt", ".ass", ".ssa"}
+
+
+def cmd_fetch(args) -> None:
+    repo = args.repo
+    needle = args.show.lower()
+    headers = {"Accept": "application/vnd.github+json"}
+    if args.token:
+        headers["Authorization"] = f"Bearer {args.token}"
+
+    # Try the show name as-is first, then search if that fails
+    encoded = urllib.parse.quote(args.show, safe="")
+    url = f"{_GITHUB_API}/repos/{repo}/contents/subtitles/anime_tv/{encoded}"
+    resp = requests.get(url, headers=headers, timeout=15)
+
+    if resp.status_code == 404:
+        # Search by listing the parent dir (paginated)
+        console.log(f"Exact match not found, searching for '{args.show}'...")
+        matches = []
+        page = 1
+        while True:
+            r = requests.get(
+                f"{_GITHUB_API}/repos/{repo}/contents/subtitles/anime_tv",
+                headers=headers, params={"per_page": 100, "page": page}, timeout=15,
+            )
+            if r.status_code != 200 or not r.json():
+                break
+            entries = r.json()
+            matches += [e for e in entries if needle in e["name"].lower() and e["type"] == "dir"]
+            if len(entries) < 100:
+                break
+            page += 1
+
+        if not matches:
+            console.print(f"[red]No show matching '{args.show}' found.[/red]")
+            raise SystemExit(1)
+        if len(matches) > 1:
+            console.print("Multiple matches — pick one with --show using the exact name:")
+            for m in matches:
+                console.print(f"  {m['name']}")
+            raise SystemExit(1)
+
+        resp = requests.get(matches[0]["url"], headers=headers, timeout=15)
+
+    if resp.status_code != 200:
+        console.print(f"[red]GitHub API error {resp.status_code}: {resp.text[:200]}[/red]")
+        raise SystemExit(1)
+
+    files = sorted(
+        [e for e in resp.json() if e["type"] == "file" and Path(e["name"]).suffix.lower() in _SUB_EXTS],
+        key=lambda e: e["name"],
+    )
+    if not files:
+        console.print("[red]No subtitle files found for this show.[/red]")
+        raise SystemExit(1)
+
+    idx = args.episode - 1
+    if not (0 <= idx < len(files)):
+        console.print(f"[red]Episode {args.episode} out of range — {len(files)} file(s) available.[/red]")
+        for i, f in enumerate(files, 1):
+            console.print(f"  {i}: {f['name']}")
+        raise SystemExit(1)
+
+    ep = files[idx]
+    console.log(f"Downloading [bold]{ep['name']}[/bold] (episode {args.episode}/{len(files)})...")
+    dl = requests.get(ep["download_url"], headers=headers, timeout=30)
+    if dl.status_code != 200:
+        console.print(f"[red]Download failed: {dl.status_code}[/red]")
+        raise SystemExit(1)
+
+    suffix = Path(ep["name"]).suffix
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(dl.content)
+        tmp_path = Path(tmp.name)
+
+    try:
+        lines = subtitles.extract_lines(tmp_path)
+    finally:
+        tmp_path.unlink()
+
+    output_path = Path(args.output) if args.output else Path(ep["name"]).with_suffix(".txt")
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+    console.log(f"Wrote [bold]{len(lines)}[/bold] lines → [bold]{output_path}[/bold]")
 
 
 def cmd_process(args) -> None:
@@ -270,6 +362,13 @@ def main():
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
+    f = sub.add_parser("fetch", help="Download one episode's subtitles → text file (one line per sentence)")
+    f.add_argument("show", help="Show name (substring match against folder names)")
+    f.add_argument("episode", nargs="?", type=int, default=1, help="Episode number (default: 1)")
+    f.add_argument("--output", metavar="FILE", help="Output path (default: <episode_filename>.txt)")
+    f.add_argument("--repo", default=_KITSUNEKKO_REPO, help="GitHub repo (owner/name)")
+    f.add_argument("--token", default=None, help="GitHub token for higher rate limits")
+
     p = sub.add_parser("process", help="Tokenize subtitles → stats.csv")
     p.add_argument("subtitles_dir", nargs="?", default=str(DEFAULT_DATA_DIR))
     p.add_argument("--output", default="stats.csv")
@@ -288,7 +387,7 @@ def main():
     e.add_argument("--genre")
 
     args = parser.parse_args()
-    {"process": cmd_process, "enrich": cmd_enrich}[args.command](args)
+    {"fetch": cmd_fetch, "process": cmd_process, "enrich": cmd_enrich}[args.command](args)
 
 
 if __name__ == "__main__":

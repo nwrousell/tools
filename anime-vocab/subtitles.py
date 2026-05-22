@@ -57,6 +57,54 @@ def extract_text(path: Path) -> str:
     return ""
 
 
+def extract_lines(path: Path) -> list[str]:
+    """Return one dialogue line per subtitle block, with tags/timestamps stripped."""
+    suffix = path.suffix.lower()
+    if suffix == ".srt":
+        return _extract_lines_srt(path)
+    elif suffix in (".ass", ".ssa"):
+        return _extract_lines_ass(path)
+    return []
+
+
+def _extract_lines_srt(path: Path) -> list[str]:
+    raw = _decode(path.read_bytes())
+    lines = []
+    for block in re.split(r"\n{2,}", raw.strip()):
+        text = "\n".join(
+            l for l in block.splitlines()
+            if not re.match(r"^\d+$", l.strip())
+            and not re.match(r"^\d{2}:\d{2}:\d{2}", l.strip())
+        ).strip()
+        if text:
+            lines.append(text.replace("\n", " "))
+    return lines
+
+
+def _extract_lines_ass(path: Path) -> list[str]:
+    raw = path.read_bytes()
+    text = _decode(raw)
+    try:
+        doc = ass_lib.parse(io.StringIO(text))
+        lines = []
+        for event in doc.events:
+            if event.TYPE == "Dialogue":
+                cleaned = _ASS_ESCAPES.sub(" ", _ASS_OVERRIDE.sub("", event.text)).strip()
+                if cleaned:
+                    lines.append(cleaned)
+        return lines
+    except Exception:
+        lines = []
+        for line in text.splitlines():
+            if line.startswith("Dialogue:"):
+                parts = line.split(",", 9)
+                if len(parts) >= 10:
+                    cleaned = _ASS_ESCAPES.sub(" ", _ASS_OVERRIDE.sub("", parts[9])).strip()
+                    if cleaned:
+                        lines.append(cleaned)
+        return lines
+
+
 def discover_shows(root: Path) -> dict[str, list[Path]]:
     shows: dict[str, list[Path]] = {}
     for entry in sorted(root.iterdir()):
