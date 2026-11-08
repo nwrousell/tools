@@ -45,6 +45,11 @@ function styleFor(p, selected, dark) {
   };
 }
 
+// Phones: no hover tooltips, and a generous tap area around each dot.
+const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+const canHover = window.matchMedia?.('(hover: hover)').matches ?? true;
+const renderer = L.canvas({ padding: 0.5, tolerance: coarsePointer ? 12 : 3 });
+
 function prefersDark() {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
 }
@@ -105,6 +110,21 @@ export function MapView({ places, selectedId, onSelect, onMove, initialView, com
     };
   }, []);
 
+  const nearestMarker = (pt) => {
+    const map = mapRef.current;
+    if (!map || !pt) return null;
+    let best = null;
+    let bestD = Infinity;
+    for (const [id, { marker }] of markersRef.current) {
+      const d = map.latLngToContainerPoint(marker.getLatLng()).distanceTo(pt);
+      if (d < bestD) {
+        bestD = d;
+        best = id;
+      }
+    }
+    return bestD <= 40 ? best : null;
+  };
+
   // Sync markers with the filtered place list.
   useEffect(() => {
     const map = mapRef.current;
@@ -126,15 +146,19 @@ export function MapView({ places, selectedId, onSelect, onMove, initialView, com
       const marker = L.circleMarker([p.lat, p.lon], {
         ...styleFor(p, p.id === selectedRef.current, darkRef.current),
         bubblingMouseEvents: false,
+        renderer,
       });
-      marker.bindTooltip(() => markers.get(p.id)?.place.title ?? p.title, {
-        direction: 'top',
-        offset: [0, -6],
-        className: 'lore-tooltip',
-      });
+      if (canHover) {
+        marker.bindTooltip(() => markers.get(p.id)?.place.title ?? p.title, {
+          direction: 'top',
+          offset: [0, -6],
+          className: 'lore-tooltip',
+        });
+      }
       marker.on('click', (e) => {
         L.DomEvent.stopPropagation(e);
-        onSelectRef.current(p.id, { from: 'map' });
+        // With a big touch radius several dots can match; pick the nearest, not the top-most.
+        onSelectRef.current(nearestMarker(e.containerPoint) ?? p.id, { from: 'map' });
       });
       marker.addTo(map);
       markers.set(p.id, { marker, sig, place: p });

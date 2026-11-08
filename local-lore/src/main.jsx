@@ -86,6 +86,8 @@ function App() {
   const [toast, setToast] = useState(null);
   const mobile = useMedia('(max-width: 720px)');
   const listRef = useRef(null);
+  const listScroll = useRef(0);
+  const touch = useRef(null);
 
   useEffect(() => storage.set(FILTERS_KEY, filters), [filters]);
   useEffect(() => storage.set('local-lore:sort', sort), [sort]);
@@ -219,6 +221,7 @@ function App() {
       if (from === 'map' && mobile) setSheetOpen(false);
       return;
     }
+    if (!selectedId) listScroll.current = listRef.current?.scrollTop ?? 0;
     setSelectedId(id);
     setTab('explore');
     const p = store.places.get(id);
@@ -227,9 +230,29 @@ function App() {
     if (from !== 'map' || mobile) flyTo(p, { zoom: Math.max(viewRef.current?.zoom ?? 16, 16) });
   };
 
-  const back = () => {
-    setSelectedId(null);
-    requestAnimationFrame(() => listRef.current?.focus?.());
+  const back = () => setSelectedId(null);
+
+  // Open a place at its top; going back returns to where you were in the list.
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = selectedId ? 0 : listScroll.current;
+  }, [selectedId]);
+
+  // Swipe the top of the sheet up or down to open or close it on phones.
+  const onSheetTouchStart = (e) => {
+    const t = e.touches[0];
+    touch.current = { x: t.clientX, y: t.clientY };
+  };
+  const onSheetTouchEnd = (e) => {
+    const start = touch.current;
+    touch.current = null;
+    if (!start || !mobile) return;
+    const t = e.changedTouches[0];
+    const dy = t.clientY - start.y;
+    const dx = t.clientX - start.x;
+    if (Math.abs(dy) < 40 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
+    setSheetOpen(dy < 0);
   };
 
   const surprise = () => {
@@ -351,6 +374,7 @@ function App() {
       />
 
       <aside className="panel" aria-label="Places">
+        <div className="sheet-top" onTouchStart={onSheetTouchStart} onTouchEnd={onSheetTouchEnd}>
         <button
           className="sheet-handle"
           aria-label={sheetOpen ? 'Collapse panel' : 'Expand panel'}
@@ -377,7 +401,7 @@ function App() {
           <form className="search" onSubmit={runSearch}>
             <input
               type="search"
-              placeholder="Search a town, street or address…"
+              placeholder="Search a town or address"
               value={search.q}
               onInput={(e) => setSearch((s) => ({ ...s, q: e.currentTarget.value }))}
               onFocus={() => mobile && setSheetOpen(true)}
@@ -413,7 +437,13 @@ function App() {
           >
             Saved{saved.length ? ` (${saved.length})` : ''}
           </button>
+          {mobile && !sheetOpen && !selected && tab === 'explore' && (
+            <span className="peek-count">
+              {sorted.length.toLocaleString()} {sorted.length === 1 ? 'place' : 'places'} here
+            </span>
+          )}
         </nav>
+        </div>
 
         <div className="panel-scroll" ref={listRef} tabIndex={-1}>
           {selected ? (

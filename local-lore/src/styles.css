@@ -55,6 +55,7 @@
 html,
 body {
   height: 100%;
+  overscroll-behavior: none; /* no pull-to-refresh while dragging the map or sheet */
 }
 
 body {
@@ -78,6 +79,18 @@ button {
   background: none;
   border: none;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Visible press feedback in place of the browser's tap flash. */
+button:active:not(:disabled),
+a.action:active {
+  filter: brightness(0.92);
+  transform: translateY(0.5px);
 }
 
 button:disabled {
@@ -451,6 +464,12 @@ select {
 .count-line {
   font-size: 0.88rem;
   color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.list-head select {
+  min-width: 0;
+  max-width: 55%;
 }
 
 .count-line strong {
@@ -887,6 +906,52 @@ select {
     bottom: var(--sheet-peek);
   }
 
+  :root {
+    --sheet-peek: calc(176px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .leaflet-top {
+    top: env(safe-area-inset-top, 0px);
+  }
+
+  .leaflet-control-attribution {
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .panel-scroll {
+    padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 16px stops iOS from zooming the page when a field gets focus. */
+  input,
+  select {
+    font-size: 16px !important;
+  }
+
+  .chip {
+    min-height: 34px;
+    padding: 6px 11px;
+  }
+
+  .group-tools .link-button {
+    padding: 4px 2px;
+  }
+
+  .action {
+    padding: 9px 13px;
+  }
+
+  .tabs {
+    align-items: center;
+  }
+
+  .peek-count {
+    margin-left: auto;
+    font-size: 0.82rem;
+    color: var(--ink-3);
+  }
+
   .panel {
     position: absolute;
     z-index: 1001; /* above Leaflet's controls */
@@ -908,9 +973,12 @@ select {
 
   .sheet-handle {
     display: flex;
+    align-items: center;
     justify-content: center;
     width: 100%;
-    padding: 8px 0 2px;
+    min-height: 32px;
+    padding: 0;
+    margin-bottom: -10px;
   }
 
   .sheet-handle span {
@@ -930,10 +998,6 @@ select {
 
   .toast {
     bottom: calc(var(--sheet-peek) + 12px);
-  }
-
-  .search input {
-    font-size: 16px; /* stop iOS zooming on focus */
   }
 
   .hero {
