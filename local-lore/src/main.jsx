@@ -3,8 +3,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { MapView } from './MapView.jsx';
 import { Detail } from './Detail.jsx';
 import { Filters, PlaceRow, QuickFlags, SORTS } from './Panel.jsx';
+import { TimeBody, TimeControls } from './TimePanel.jsx';
 import { LoreStore, MIN_OSM_ZOOM, MIN_WIKI_ZOOM } from './store.js';
-import { CATEGORIES, ERAS, eraOf } from './classify.js';
+import { CATEGORIES, ERAS, eraOf, formatYear } from './classify.js';
+import {
+  eventAt,
+  FRESH_WINDOW,
+  histogram,
+  makeScale,
+  startYear,
+  isFresh,
+  PHOTO_WINDOW,
+  presenceAt,
+  yearRange,
+} from './time.js';
 import { searchPlaces } from './api.js';
 import { distanceMeters, inBounds, readHash, storage, writeHash } from './util.js';
 import './styles.css';
@@ -75,7 +87,12 @@ function App() {
   const [sort, setSort] = useState(() => storage.get('local-lore:sort', 'near'));
   const [selectedId, setSelectedId] = useState(null);
   const pendingPlace = useRef(hash.place || null);
-  const [tab, setTab] = useState('explore');
+  const [tab, setTab] = useState(hash.year != null ? 'time' : 'explore');
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+  const timeMode = tab === 'time';
+  const [year, setYear] = useState(hash.year ?? null);
+  const [playing, setPlaying] = useState(false);
   const [command, setCommand] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [locating, setLocating] = useState(false);
@@ -97,6 +114,10 @@ function App() {
       if (!v) return;
       store.loadWikipedia(v);
       if (filtersRef.current.categories.markers) store.loadOsm(v);
+      if (tabRef.current === 'time') {
+        store.loadTown(v);
+        store.loadPhotos(v);
+      }
     },
     [store],
   );
@@ -112,6 +133,12 @@ function App() {
     [load],
   );
 
+  // Entering time travel loads the town's history and old photos.
+  useEffect(() => {
+    if (timeMode) load(viewRef.current);
+    else setPlaying(false);
+  }, [timeMode]);
+
   // Turning the plaques layer on should load it right away.
   useEffect(() => {
     if (filters.categories.markers) load(viewRef.current);
@@ -126,8 +153,8 @@ function App() {
 
   // Keep the URL shareable.
   useEffect(() => {
-    if (view) writeHash({ view, lang, place: selectedId });
-  }, [view, lang, selectedId]);
+    if (view) writeHash({ view, lang, place: selectedId, year: timeMode ? year : null });
+  }, [view, lang, selectedId, timeMode, playing ? null : year]);
 
   // Select a place from a shared link once it has loaded.
   useEffect(() => {
@@ -148,6 +175,8 @@ function App() {
     const eraCounts = {};
     const onMap = [];
     const inView = [];
+    const baseOnMap = [];
+    const baseInView = [];
     for (const p of store.places.values()) {
       if (!p.ready) continue;
       if (p.source === 'wikipedia' && p.lang !== lang && !p.saved) continue;
@@ -167,13 +196,114 @@ function App() {
         if (okEra) counts[p.category] = (counts[p.category] || 0) + 1;
         if (okCat) eraCounts[era] = (eraCounts[era] || 0) + 1;
       }
-      if (okCat && okEra && okRest) {
-        onMap.push(p);
-        if (visible) inView.push(p);
+      if (okCat && okRest) {
+        baseOnMap.push(p);
+        if (visible) baseInView.push(p);
+        if (okEra) {
+          onMap.push(p);
+          if (visible) inView.push(p);
+        }
       }
     }
-    return { counts, eraCounts, onMap, inView };
+    return { counts, eraCounts, onMap, inView, baseOnMap, baseInView };
   }, [version, filters, query, view, lang]);
+
+  // ------------------------------------------------------------ time travel
+
+  const range = useMemo(
+    () => yearRange(derived.baseInView.length ? derived.baseInView : derived.baseOnMap),
+    [derived],
+  );
+  const opening = useMemo(
+    () => startYear(derived.baseInView.length ? derived.baseInView : derived.baseOnMap, range),
+    [derived, range],
+  );
+  const tYear = Math.min(range.max, Math.max(range.min, year ?? opening));
+  const scale = useMemo(() => makeScale(range), [range.min, range.max]);
+  const hist = useMemo(() => histogram(derived.baseInView, scale), [derived, scale]);
+
+  const timeView = useMemo(() => {
+    if (!timeMode) return null;
+    const onMap = [];
+    const inView = [];
+    const fresh = new Set();
+    const built = [];
+    const gone = [];
+    let undated = 0;
+    for (const p of derived.baseOnMap) {
+      const visible = view && inBounds(view, p.lat, p.lon);
+      if (p.year == null) {
+        if (visible) undated++;
+        continue;
+      }
+      const presence = presenceAt(p, tYear);
+      const isNew = isFresh(p, tYear);
+      if (presence) {
+        onMap.push(p);
+        if (visible) inView.push(p);
+        if (presence === 'event' || isNew) fresh.add(p.id);
+      }
+      if (!visible) continue;
+      if (isNew && presence) built.push(p);
+      if (p.endYear != null && tYear >= p.endYear && tYear - p.endYear < FRESH_WINDOW) gone.push(p);
+    }
+    built.sort((a, b) => b.year - a.year);
+    gone.sort((a, b) => b.endYear - a.endYear);
+    return {
+      onMap,
+      inView,
+      fresh,
+      built: built.slice(0, 15),
+      gone: gone.slice(0, 10),
+      stats: { standing: inView.length, fresh: built.length, undated },
+    };
+  }, [timeMode, derived, tYear, view]);
+
+  const photosNow = useMemo(() => {
+    if (!timeMode) return { onMap: [], inView: [] };
+    const near = [];
+    for (const ph of store.photos.values()) if (Math.abs(ph.year - tYear) <= PHOTO_WINDOW) near.push(ph);
+    const c = view || initialView;
+    near.sort((a, b) => distanceMeters(c.lat, c.lon, a.lat, a.lon) - distanceMeters(c.lat, c.lon, b.lat, b.lon));
+    const inView = near
+      .filter((ph) => view && inBounds(view, ph.lat, ph.lon))
+      .sort((a, b) => Math.abs(a.year - tYear) - Math.abs(b.year - tYear))
+      .slice(0, 40);
+    return { onMap: near.slice(0, 120), inView };
+  }, [timeMode, version, tYear, view]);
+
+  const town = store.town;
+  const eventIndex = town?.events?.length ? eventAt(town.events, tYear) : -1;
+  const narration = eventIndex >= 0 && tYear - town.events[eventIndex].year <= 25 ? town.events[eventIndex] : null;
+
+  // Play: sweep the slider from where it is to today in about 25 seconds.
+  useEffect(() => {
+    if (!playing) return;
+    const perSecond = 1 / 25;
+    // The first play (nothing scrubbed yet) tells the story from the beginning.
+    let pos = year == null || tYear >= range.max ? 0 : scale.toPos(tYear);
+    let last = performance.now();
+    let raf = 0;
+    setYear(scale.toYear(pos));
+    const tick = (now) => {
+      pos += ((now - last) / 1000) * perSecond;
+      last = now;
+      if (pos >= 1) {
+        setYear(range.max);
+        setPlaying(false);
+        return;
+      }
+      setYear(scale.toYear(pos));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing]);
+
+  const scrubTo = (y) => {
+    setPlaying(false);
+    setYear(y);
+  };
 
   // Distances are from you if you're on screen, otherwise from the map center.
   const origin = useMemo(() => {
@@ -195,7 +325,7 @@ function App() {
     return withD.sort(cmp);
   }, [derived, origin, sort]);
 
-  const selected = selectedId ? store.places.get(selectedId) : null;
+  const selected = selectedId ? store.places.get(selectedId) || store.photos.get(selectedId) : null;
 
   const nearby = useMemo(() => {
     if (!selected) return [];
@@ -223,8 +353,8 @@ function App() {
     }
     if (!selectedId) listScroll.current = listRef.current?.scrollTop ?? 0;
     setSelectedId(id);
-    setTab('explore');
-    const p = store.places.get(id);
+    setTab((t) => (t === 'saved' ? 'explore' : t));
+    const p = store.places.get(id) || store.photos.get(id);
     if (!p) return;
     if (mobile) setSheetOpen(true);
     if (from !== 'map' || mobile) flyTo(p, { zoom: Math.max(viewRef.current?.zoom ?? 16, 16) });
@@ -256,7 +386,8 @@ function App() {
   };
 
   const surprise = () => {
-    const pool = derived.inView.length ? derived.inView : derived.onMap;
+    const base = timeMode ? timeView : derived;
+    const pool = base.inView.length ? base.inView : base.onMap;
     if (!pool.length) {
       setToast('Nothing loaded here yet. Pan or zoom in first.');
       return;
@@ -362,9 +493,11 @@ function App() {
   // ------------------------------------------------------------ render
 
   return (
-    <div className={`app ${sheetOpen ? 'sheet-open' : ''}`}>
+    <div className={`app ${sheetOpen ? 'sheet-open' : ''} ${timeMode ? 'time-mode' : ''}`}>
       <MapView
-        places={derived.onMap}
+        places={timeMode ? timeView.onMap : derived.onMap}
+        fresh={timeView?.fresh}
+        photos={photosNow.onMap}
         selectedId={selectedId}
         onSelect={onSelect}
         onMove={onMove}
@@ -372,6 +505,23 @@ function App() {
         command={command}
         userLocation={userLocation}
       />
+
+      {timeMode && (
+        <div className="time-badge">
+          <div className="tb-year">{formatYear(tYear)}</div>
+          {narration && (
+            <button
+              className="tb-caption"
+              onClick={() => {
+                setSelectedId(null);
+                setSheetOpen(true);
+              }}
+            >
+              <span className="tb-when">{formatYear(narration.year)}</span> {narration.text}
+            </button>
+          )}
+        </div>
+      )}
 
       <aside className="panel" aria-label="Places">
         <div className="sheet-top" onTouchStart={onSheetTouchStart} onTouchEnd={onSheetTouchEnd}>
@@ -424,9 +574,30 @@ function App() {
           )}
         </header>
 
+        {timeMode && (
+          <TimeControls
+            year={tYear}
+            range={range}
+            scale={scale}
+            hist={hist}
+            playing={playing}
+            onYear={scrubTo}
+            onPlay={() => setPlaying((p) => !p)}
+          />
+        )}
+
         <nav className="tabs">
           <button className={tab === 'explore' ? 'on' : ''} onClick={() => setTab('explore')}>
             Explore
+          </button>
+          <button
+            className={tab === 'time' ? 'on' : ''}
+            onClick={() => {
+              setTab('time');
+              setSelectedId(null);
+            }}
+          >
+            Time travel
           </button>
           <button
             className={tab === 'saved' ? 'on' : ''}
@@ -439,7 +610,7 @@ function App() {
           </button>
           {mobile && !sheetOpen && !selected && tab === 'explore' && (
             <span className="peek-count">
-              {sorted.length.toLocaleString()} {sorted.length === 1 ? 'place' : 'places'} here
+              {sorted.length.toLocaleString()} {sorted.length === 1 ? 'place' : 'places'}
             </span>
           )}
         </nav>
@@ -454,6 +625,20 @@ function App() {
               onBack={back}
               onSelect={onSelect}
               distance={origin ? distanceMeters(origin.lat, origin.lon, selected.lat, selected.lon) : null}
+            />
+          ) : tab === 'time' ? (
+            <TimeBody
+              year={tYear}
+              stats={timeView.stats}
+              town={town}
+              eventIndex={eventIndex}
+              photos={photosNow.inView}
+              photoNote={store.notes.photos}
+              built={timeView.built}
+              gone={timeView.gone}
+              onYear={scrubTo}
+              onSelect={onSelect}
+              store={store}
             />
           ) : tab === 'saved' ? (
             <div className="saved">

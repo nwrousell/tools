@@ -837,6 +837,345 @@ select {
   font-size: 0.76rem;
 }
 
+/* ------------------------------------------------------------------ time travel */
+
+.time-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.play {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+}
+
+.play svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.play:not(.on) svg {
+  margin-left: 2px;
+}
+
+.time-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Bars sit on the slider track; padded by the thumb's half-width so a bar lines
+   up with the thumb at that year. */
+.hist {
+  display: block;
+  width: calc(100% - 22px);
+  height: 26px;
+  margin: 0 11px -9px;
+}
+
+.hist .past {
+  fill: var(--accent);
+  opacity: 0.55;
+}
+
+.hist .future {
+  fill: var(--ink-3);
+  opacity: 0.22;
+}
+
+.time-track input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  margin: 0;
+  position: relative;
+  touch-action: pan-y; /* horizontal drags scrub; vertical still scrolls */
+}
+
+.time-track input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.time-track input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.time-track input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -9px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 3px solid var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.time-track input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 3px solid var(--accent);
+}
+
+.time-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  margin-top: -2px;
+}
+
+.time-year {
+  flex: none;
+  min-width: 3.4ch;
+  text-align: right;
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 1.45rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-body {
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.time-stats {
+  font-size: 0.88rem;
+  color: var(--ink-2);
+}
+
+.time-stats strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.time-h {
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.time-h .count {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--ink-3);
+}
+
+.events {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.event {
+  display: grid;
+  grid-template-columns: 3.6em 1fr;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 6px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.event:hover {
+  background: var(--chip);
+}
+
+.event-year {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.event-text {
+  min-width: 0;
+  font-family: var(--serif);
+  font-size: 0.98rem;
+}
+
+.event.current {
+  background: var(--chip);
+}
+
+.event.current .event-year {
+  color: var(--accent);
+}
+
+.event.later {
+  opacity: 0.5;
+}
+
+.time-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin-top: 6px;
+  font-size: 0.78rem;
+}
+
+.small-note {
+  font-size: 0.78rem;
+}
+
+.photo-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
+}
+
+.photo-tile {
+  flex: none;
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--chip);
+  scroll-snap-align: start;
+}
+
+.photo-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: sepia(0.15);
+}
+
+.photo-tile span {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(20, 16, 12, 0.72);
+  color: #f6efe3;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-photo {
+  background: #1a1714;
+  max-height: 340px;
+}
+
+.hero-photo img {
+  object-fit: contain;
+  max-height: 340px;
+}
+
+/* Year over the map */
+.time-badge {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: calc(var(--panel-w) + 14px);
+  max-width: min(440px, calc(100vw - var(--panel-w) - 90px));
+  z-index: 450;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.tb-year {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 2.6rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  padding: 4px 12px 6px;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+.tb-caption {
+  pointer-events: auto;
+  text-align: left;
+  font-family: var(--serif);
+  font-size: 0.92rem;
+  line-height: 1.35;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  padding: 7px 11px;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tb-when {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--accent);
+  margin-right: 2px;
+}
+
+/* Photo pins on the map */
+.photo-pin {
+  background: none;
+  border: none;
+}
+
+.photo-pin-inner {
+  width: 38px;
+  height: 38px;
+  border-radius: 7px;
+  overflow: hidden;
+  border: 2px solid #fffaf3;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  background: #ccc;
+}
+
+.photo-pin-inner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: sepia(0.2);
+}
+
+.photo-pin.selected .photo-pin-inner {
+  border-color: var(--accent);
+  transform: scale(1.25);
+}
+
 /* ------------------------------------------------------------------ misc */
 
 .toast {
@@ -960,6 +1299,11 @@ select {
     margin-left: auto;
     font-size: 0.82rem;
     color: var(--ink-3);
+    white-space: nowrap;
+  }
+
+  .tabs button {
+    margin-right: 10px;
   }
 
   .panel {
@@ -1008,6 +1352,33 @@ select {
 
   .toast {
     bottom: calc(var(--sheet-peek) + 12px);
+  }
+
+  /* Time travel: the slider replaces the search box in the always-visible top of the sheet. */
+  .time-mode {
+    --sheet-peek: calc(196px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .time-mode .search,
+  .time-mode .search-results {
+    display: none;
+  }
+
+  .time-mode .brand {
+    padding-bottom: 6px;
+  }
+
+  .time-badge {
+    left: 12px;
+    max-width: calc(100vw - 80px);
+  }
+
+  .tb-year {
+    font-size: 2rem;
+  }
+
+  .tb-caption {
+    font-size: 0.85rem;
   }
 
   .hero {

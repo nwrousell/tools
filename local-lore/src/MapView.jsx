@@ -31,13 +31,24 @@ function radiusFor(p) {
   return 4 + Math.max(0, Math.min(6, (lv - 1.5) * 1.6));
 }
 
-function styleFor(p, selected, dark) {
+// "New" in time travel: just built, or an event happening right now.
+const FRESH_RING = { light: '#a4441c', dark: '#f0a070' };
+
+function styleFor(p, selected, dark, fresh = false) {
   const color = CATEGORY_BY_ID[p.category]?.color || '#999';
-  const r = radiusFor(p);
+  const r = radiusFor(p) + (fresh ? 2 : 0);
   return {
     radius: selected ? r + 4 : r,
-    color: selected ? (dark ? '#fff' : '#1d1a16') : dark ? '#1d1a16' : '#ffffff',
-    weight: selected ? 3 : 1.5,
+    color: selected
+      ? dark
+        ? '#fff'
+        : '#1d1a16'
+      : fresh
+        ? FRESH_RING[dark ? 'dark' : 'light']
+        : dark
+          ? '#1d1a16'
+          : '#ffffff',
+    weight: selected ? 3 : fresh ? 3 : 1.5,
     fillColor: color,
     fillOpacity: p.lost ? 0.45 : 0.92,
     dashArray: p.lost && !selected ? '2 2' : null,
@@ -53,7 +64,7 @@ function prefersDark() {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
 }
 
-export function MapView({ places, selectedId, onSelect, onMove, initialView, command, userLocation }) {
+export function MapView({ places, fresh, photos, selectedId, onSelect, onMove, initialView, command, userLocation }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef(new Map()); // id -> { marker, sig }
@@ -62,6 +73,10 @@ export function MapView({ places, selectedId, onSelect, onMove, initialView, com
   const onMoveRef = useRef(onMove);
   const selectedRef = useRef(selectedId);
   const userLayerRef = useRef(null);
+  const freshRef = useRef(fresh);
+  freshRef.current = fresh;
+  const photoLayerRef = useRef(null);
+  const photoMarkersRef = useRef(new Map()); // id -> L.marker
   onSelectRef.current = onSelect;
   onMoveRef.current = onMove;
 
@@ -88,7 +103,9 @@ export function MapView({ places, selectedId, onSelect, onMove, initialView, com
     const onScheme = () => {
       darkRef.current = mq.matches;
       for (const [id, entry] of markersRef.current) {
-        entry.marker.setStyle(styleFor(entry.place, id === selectedRef.current, darkRef.current));
+        entry.marker.setStyle(
+          styleFor(entry.place, id === selectedRef.current, darkRef.current, freshRef.current?.has(id)),
+        );
       }
     };
     mq?.addEventListener?.('change', onScheme);
@@ -131,18 +148,19 @@ export function MapView({ places, selectedId, onSelect, onMove, initialView, com
     const keep = new Set();
     for (const p of places) {
       keep.add(p.id);
-      const sig = `${p.category}|${p.lost}|${p.views}`;
+      const isFresh = Boolean(fresh?.has(p.id));
+      const sig = `${p.category}|${p.lost}|${p.views}|${isFresh}`;
       const existing = markers.get(p.id);
       if (existing) {
         existing.place = p;
         if (existing.sig !== sig) {
           existing.sig = sig;
-          existing.marker.setStyle(styleFor(p, p.id === selectedRef.current, darkRef.current));
+          existing.marker.setStyle(styleFor(p, p.id === selectedRef.current, darkRef.current, isFresh));
         }
         continue;
       }
       const marker = L.circleMarker([p.lat, p.lon], {
-        ...styleFor(p, p.id === selectedRef.current, darkRef.current),
+        ...styleFor(p, p.id === selectedRef.current, darkRef.current, isFresh),
         bubblingMouseEvents: false,
         renderer,
       });
@@ -172,17 +190,58 @@ export function MapView({ places, selectedId, onSelect, onMove, initialView, com
     }
     const sel = markers.get(selectedRef.current);
     if (sel) sel.marker.bringToFront();
-  }, [places]);
+  }, [places, fresh]);
+
+  // Old photos (time travel): small thumbnail pins, drawn above the dots.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!photoLayerRef.current) photoLayerRef.current = L.layerGroup().addTo(map);
+    const layer = photoLayerRef.current;
+    const pins = photoMarkersRef.current;
+    const keep = new Set();
+    for (const ph of photos || []) {
+      keep.add(ph.id);
+      if (pins.has(ph.id)) continue;
+      const img = document.createElement('img');
+      img.src = ph.thumb;
+      img.alt = '';
+      img.loading = 'lazy';
+      const wrap = document.createElement('div');
+      wrap.className = 'photo-pin-inner';
+      wrap.appendChild(img);
+      const icon = L.divIcon({ className: 'photo-pin', html: wrap, iconSize: [38, 38], iconAnchor: [19, 19] });
+      const pin = L.marker([ph.lat, ph.lon], { icon, keyboard: false, riseOnHover: true, title: ph.title });
+      pin.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        onSelectRef.current(ph.id, { from: 'map' });
+      });
+      pin.addTo(layer);
+      pins.set(ph.id, pin);
+    }
+    for (const [id, pin] of pins) {
+      if (!keep.has(id)) {
+        pin.remove();
+        pins.delete(id);
+      }
+    }
+  }, [photos]);
+
+  useEffect(() => {
+    for (const [id, pin] of photoMarkersRef.current) {
+      pin.getElement()?.classList.toggle('selected', id === selectedId);
+    }
+  }, [selectedId, photos]);
 
   // Selection highlight.
   useEffect(() => {
     const markers = markersRef.current;
     const prev = markers.get(selectedRef.current);
-    if (prev) prev.marker.setStyle(styleFor(prev.place, false, darkRef.current));
+    if (prev) prev.marker.setStyle(styleFor(prev.place, false, darkRef.current, freshRef.current?.has(prev.place.id)));
     selectedRef.current = selectedId;
     const next = markers.get(selectedId);
     if (next) {
-      next.marker.setStyle(styleFor(next.place, true, darkRef.current));
+      next.marker.setStyle(styleFor(next.place, true, darkRef.current, freshRef.current?.has(selectedId)));
       next.marker.bringToFront();
     }
   }, [selectedId]);

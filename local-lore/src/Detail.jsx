@@ -136,7 +136,21 @@ function OsmBody({ place }) {
   );
 }
 
+function PhotoBody({ place }) {
+  return (
+    <div className="detail-body">
+      {place.note && <p>{place.note}</p>}
+      {place.artist && <p className="muted">Photo: {place.artist}</p>}
+      <p className="muted small-note">
+        Dated {formatYear(place.year)} from the file’s information on Wikimedia Commons; old dates are often
+        approximate.
+      </p>
+    </div>
+  );
+}
+
 export function Detail({ place, store, nearby, onBack, onSelect, distance }) {
+  const isPhoto = place.source === 'commons';
   const cat = CATEGORY_BY_ID[place.category];
   const img = place.thumb || (place.source === 'osm' ? commonsThumb(place.commons) : null);
   const [copied, setCopied] = useState(false);
@@ -160,17 +174,17 @@ export function Detail({ place, store, nearby, onBack, onSelect, distance }) {
   return (
     <article className="detail">
       <button className="back" onClick={onBack}>
-        ← Back to list
+        ← Back
       </button>
       {img && (
-        <div className="hero">
+        <div className={`hero ${isPhoto ? 'hero-photo' : ''}`}>
           <img src={img} alt="" loading="lazy" />
         </div>
       )}
       <div className="detail-head">
         <div className="eyebrow">
-          <span className="dot" style={{ background: cat?.color }} />
-          {place.source === 'osm' ? place.kind : cat?.label}
+          {!isPhoto && <span className="dot" style={{ background: cat?.color }} />}
+          {isPhoto ? 'Old photo' : place.source === 'osm' ? place.kind : cat?.label}
           {years && <span className="sep">·</span>}
           {years && <span>{years}</span>}
           {distance != null && <span className="sep">·</span>}
@@ -188,15 +202,21 @@ export function Detail({ place, store, nearby, onBack, onSelect, distance }) {
           ))}
         </div>
         <div className="actions">
-          <button className={`action ${place.saved ? 'on' : ''}`} onClick={() => store.toggleSaved(place.id)}>
-            {place.saved ? '★ Saved' : '☆ Save'}
-          </button>
+          {!isPhoto && (
+            <button className={`action ${place.saved ? 'on' : ''}`} onClick={() => store.toggleSaved(place.id)}>
+              {place.saved ? '★ Saved' : '☆ Save'}
+            </button>
+          )}
           <a className="action" href={directionsUrl(place)} target="_blank" rel="noopener">
             Directions ↗
           </a>
           {place.source === 'wikipedia' ? (
             <a className="action" href={wikiUrl(place)} target="_blank" rel="noopener">
               Wikipedia ↗
+            </a>
+          ) : isPhoto ? (
+            <a className="action" href={place.page} target="_blank" rel="noopener">
+              Wikimedia Commons ↗
             </a>
           ) : (
             <a
@@ -214,7 +234,13 @@ export function Detail({ place, store, nearby, onBack, onSelect, distance }) {
         </div>
       </div>
 
-      {place.source === 'wikipedia' ? <WikiBody place={place} /> : <OsmBody place={place} />}
+      {place.source === 'wikipedia' ? (
+        <WikiBody place={place} />
+      ) : isPhoto ? (
+        <PhotoBody place={place} />
+      ) : (
+        <OsmBody place={place} />
+      )}
 
       {nearby.length > 0 && (
         <div className="nearby">

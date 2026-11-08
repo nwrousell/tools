@@ -227,3 +227,137 @@ export async function searchPlaces(q, signal) {
     bbox: r.boundingbox ? r.boundingbox.map(Number) : null,
   }));
 }
+
+// ---------------------------------------------------------------- town history
+
+// Which town is this point in? zoom=10 asks Nominatim for city/town level.
+export async function reverseGeocode(lat, lon, lang, signal) {
+  const url = new URL('https://nominatim.openstreetmap.org/reverse');
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('lat', String(r5(lat)));
+  url.searchParams.set('lon', String(r5(lon)));
+  url.searchParams.set('zoom', '10');
+  url.searchParams.set('extratags', '1');
+  url.searchParams.set('accept-language', lang);
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new ApiError(`Place lookup returned ${res.status}`, `http-${res.status}`);
+  const json = await res.json();
+  if (json.error) return null;
+  const a = json.address || {};
+  return {
+    name: json.name || a.city || a.town || a.village || a.municipality || a.county || null,
+    qid: json.extratags?.wikidata || null,
+    wikipedia: json.extratags?.wikipedia || null, // "en:Boston"
+    osmId: `${json.osm_type}/${json.osm_id}`,
+  };
+}
+
+// Title of a Wikidata item's article on a given Wikipedia.
+export async function wikidataSitelink(qid, lang, signal) {
+  const url = new URL('https://www.wikidata.org/w/api.php');
+  for (const [k, v] of Object.entries({
+    action: 'wbgetentities',
+    ids: qid,
+    props: 'sitelinks',
+    sitefilter: `${lang}wiki`,
+    format: 'json',
+    origin: '*',
+  }))
+    url.searchParams.set(k, v);
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new ApiError(`Wikidata returned ${res.status}`, `http-${res.status}`);
+  const json = await res.json();
+  return json.entities?.[qid]?.sitelinks?.[`${lang}wiki`]?.title || null;
+}
+
+// Which of these titles exist (following redirects)? Returns Map<asked title, real title>.
+export async function existingPages(lang, titles, signal) {
+  const json = await wikiQuery(lang, { titles: titles.join('|'), redirects: 1, prop: 'info' }, signal);
+  const q = json.query || {};
+  const rename = new Map();
+  for (const n of q.normalized || []) rename.set(n.from, n.to);
+  for (const r of q.redirects || []) rename.set(r.from, r.to);
+  const resolve = (t) => {
+    let cur = t;
+    for (let i = 0; i < 4 && rename.has(cur); i++) cur = rename.get(cur);
+    return cur;
+  };
+  const present = new Set((q.pages || []).filter((p) => !p.missing && !p.invalid).map((p) => p.title));
+  const out = new Map();
+  for (const t of titles) {
+    const real = resolve(t);
+    if (present.has(real)) out.set(t, real);
+  }
+  return out;
+}
+
+export async function fetchArticleText(lang, title, signal) {
+  const json = await wikiQuery(
+    lang,
+    { titles: title, redirects: 1, prop: 'extracts', explaintext: 1, exsectionformat: 'wiki' },
+    signal,
+  );
+  return json.query?.pages?.[0]?.extract || '';
+}
+
+// ---------------------------------------------------------------- Commons photos
+
+const COMMONS = 'https://commons.wikimedia.org/w/api.php';
+
+async function commonsQuery(params, signal) {
+  const url = new URL(COMMONS);
+  const all = { action: 'query', format: 'json', formatversion: '2', origin: '*', ...params };
+  for (const [k, v] of Object.entries(all)) url.searchParams.set(k, String(v));
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new ApiError(`Wikimedia Commons returned ${res.status}`, `http-${res.status}`);
+  const json = await res.json();
+  if (json.error) throw new ApiError(json.error.info || json.error.code, json.error.code);
+  return json;
+}
+
+// Geotagged files in an area (same area shapes as geosearch()).
+export async function commonsGeosearch(area, signal) {
+  const params = { list: 'geosearch', gslimit: 500, gsnamespace: 6 };
+  if (area.type === 'bbox') params.gsbbox = `${r5(area.n)}|${r5(area.w)}|${r5(area.s)}|${r5(area.e)}`;
+  else {
+    params.gscoord = `${r5(area.lat)}|${r5(area.lon)}`;
+    params.gsradius = Math.max(10, Math.min(10000, Math.round(area.radius)));
+  }
+  const json = await commonsQuery(params, signal);
+  return json.query?.geosearch ?? [];
+}
+
+// Up to 50 file pageids -> Map<pageid, { thumb, page, date, name, artist, description }>.
+export async function commonsFileInfo(pageids, signal) {
+  const out = new Map();
+  let cont = {};
+  for (let round = 0; round < 4; round++) {
+    const json = await commonsQuery(
+      {
+        pageids: pageids.join('|'),
+        prop: 'imageinfo',
+        iiprop: 'url|extmetadata',
+        iiurlwidth: 480,
+        iiextmetadatafilter: 'DateTimeOriginal|ObjectName|Artist|ImageDescription',
+        ...cont,
+      },
+      signal,
+    );
+    for (const p of json.query?.pages ?? []) {
+      const ii = p.imageinfo?.[0];
+      if (!ii || out.has(p.pageid)) continue;
+      const md = ii.extmetadata || {};
+      out.set(p.pageid, {
+        thumb: ii.thumburl || null,
+        page: ii.descriptionurl || null,
+        date: md.DateTimeOriginal?.value ?? null,
+        name: md.ObjectName?.value ?? null,
+        artist: md.Artist?.value ?? null,
+        description: md.ImageDescription?.value ?? null,
+      });
+    }
+    if (!json.continue) break;
+    cont = json.continue;
+  }
+  return out;
+}

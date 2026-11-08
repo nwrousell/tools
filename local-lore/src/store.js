@@ -5,12 +5,28 @@ import {
   fetchOsmMarkers,
   sumPageviews,
   OSM_LIMIT,
+  reverseGeocode,
+  wikidataSitelink,
+  existingPages,
+  fetchArticleText,
+  parseSections,
+  commonsGeosearch,
+  commonsFileInfo,
 } from './api.js';
+import {
+  eventsFromTimeline,
+  eventsFromProse,
+  historySections,
+  photoYear,
+  stripHtml,
+  PHOTO_MAX_YEAR,
+} from './time.js';
 import { classify, parseYear } from './classify.js';
 import { bboxAreaKm2, bboxContains, chunk, mapLimit, percentile, storage, distanceMeters } from './util.js';
 
 export const MIN_WIKI_ZOOM = 11;
 export const MIN_OSM_ZOOM = 14;
+export const MIN_PHOTO_ZOOM = 13;
 // GeoData rejects boxes much bigger than 20 km x 20 km; stay comfortably under.
 const MAX_BBOX_KM2 = 300;
 const GEO_LIMIT = 500;
@@ -123,11 +139,16 @@ export class LoreStore {
     this.lang = lang;
     this.places = new Map();
     this.version = 0;
-    this.pending = { wikipedia: 0, wikidata: 0, osm: 0 };
+    this.pending = { wikipedia: 0, wikidata: 0, osm: 0, history: 0, photos: 0 };
+    this.photos = new Map();
+    this.photoSeen = new Set();
+    this.town = null; // { name, title, lang, events, sources, status }
+    this._townKey = null;
+    this._townAt = null;
     this.errors = {};
     this.notes = {};
     this.listeners = new Set();
-    this.searched = { wikipedia: [], osm: [] };
+    this.searched = { wikipedia: [], osm: [], photos: [] };
     this.saved = new Map(storage.get(SAVED_KEY, []).map((p) => [p.id, p]));
     for (const p of this.saved.values()) this.places.set(p.id, { ...p, saved: true });
     this._raf = 0;
@@ -148,7 +169,7 @@ export class LoreStore {
   }
 
   get loading() {
-    return this.pending.wikipedia + this.pending.wikidata + this.pending.osm > 0;
+    return Object.values(this.pending).some((n) => n > 0);
   }
 
   async track(source, fn) {
@@ -175,6 +196,9 @@ export class LoreStore {
       if (p.source === 'wikipedia' && !p.saved) this.places.delete(id);
     }
     this.searched.wikipedia = [];
+    this.town = null;
+    this._townKey = null;
+    this._townAt = null;
     this.emit();
   }
 
@@ -282,6 +306,126 @@ export class LoreStore {
     });
   }
 
+  // ---------------------------------------------------------- town history
+
+  loadTown(view) {
+    const lang = this.lang;
+    // Re-identify the town only after moving a couple of km.
+    if (this._townAt && this._townAt.lang === lang) {
+      const moved = distanceMeters(this._townAt.lat, this._townAt.lon, view.lat, view.lon);
+      if (moved < 2500) return;
+    }
+    this._townAt = { lat: view.lat, lon: view.lon, lang };
+
+    return this.track('history', async () => {
+      const place = await reverseGeocode(view.lat, view.lon, lang);
+      if (!place || !place.name) return;
+      const key = `${lang}|${place.qid || place.osmId}`;
+      if (key === this._townKey) return;
+      this._townKey = key;
+      this.town = { name: place.name, title: null, lang, events: [], sources: [], status: 'loading' };
+      this.emit();
+
+      let title = null;
+      if (place.wikipedia && place.wikipedia.startsWith(`${lang}:`)) title = place.wikipedia.slice(lang.length + 1);
+      else if (place.qid) title = await wikidataSitelink(place.qid, lang);
+      if (key !== this._townKey) return;
+      if (!title) {
+        this.town = { ...this.town, status: 'none' };
+        return;
+      }
+
+      const candidates = historyTitles(lang, title);
+      const asked = [...candidates.timeline, ...candidates.history];
+      const found = asked.length ? await existingPages(lang, asked) : new Map();
+      const timeline = candidates.timeline.map((t) => found.get(t)).find(Boolean);
+      const history = candidates.history.map((t) => found.get(t)).find(Boolean);
+
+      let events = [];
+      const sources = [];
+      if (timeline) {
+        events = eventsFromTimeline(parseSections(await fetchArticleText(lang, timeline)));
+        if (events.length) sources.push(timeline);
+      }
+      if (events.length < 15) {
+        const prose = history
+          ? parseSections(await fetchArticleText(lang, history))
+          : historySections(parseSections(await fetchArticleText(lang, title)));
+        const more = eventsFromProse(prose);
+        if (more.length) {
+          sources.push(history || title);
+          const seen = new Set(events.map((e) => e.text));
+          events = [...events, ...more.filter((e) => !seen.has(e.text))].sort((a, b) => a.year - b.year);
+        }
+      }
+      if (key !== this._townKey) return;
+      this.town = {
+        name: place.name,
+        title,
+        lang,
+        events,
+        sources: sources.map((t) => ({ title: t, url: wikiUrl(lang, t) })),
+        status: events.length ? 'ready' : 'none',
+      };
+    }).then(() => {
+      if (this.errors.history && this.town?.status === 'loading') {
+        this.town = { ...this.town, status: 'error' };
+        this.emit();
+      }
+    });
+  }
+
+  // ---------------------------------------------------------- old photos
+
+  loadPhotos(view) {
+    if (view.zoom < MIN_PHOTO_ZOOM) {
+      this.notes.photos = 'zoom';
+      this.emit();
+      return;
+    }
+    this.notes.photos = null;
+    const bounds = { n: view.n, s: view.s, e: view.e, w: view.w };
+    if (this.searched.photos.some((b) => bboxContains(b, bounds))) return;
+    const useBox = bboxAreaKm2(bounds) <= MAX_BBOX_KM2;
+    const area = useBox ? { type: 'bbox', ...bounds } : { type: 'radius', lat: view.lat, lon: view.lon, radius: 10000 };
+
+    return this.track('photos', async () => {
+      const files = await commonsGeosearch(area);
+      if (files.length < GEO_LIMIT) {
+        this.searched.photos.push(useBox ? bounds : inscribedBox(view.lat, view.lon, 10000));
+      }
+      const fresh = files.filter((f) => !this.photoSeen.has(f.pageid) && /\.(jpe?g|png|tiff?|gif|webp)$/i.test(f.title));
+      for (const f of fresh) this.photoSeen.add(f.pageid);
+      await mapLimit(chunk(fresh, 50), 3, async (batch) => {
+        const info = await commonsFileInfo(batch.map((f) => f.pageid));
+        for (const f of batch) {
+          const i = info.get(f.pageid);
+          const year = photoYear(i?.date);
+          if (!i?.thumb || year == null || year > PHOTO_MAX_YEAR) continue;
+          const name = stripHtml(i.name) || f.title.replace(/^File:/, '').replace(/\.[a-z]+$/i, '');
+          this.photos.set(`photo:${f.pageid}`, {
+            id: `photo:${f.pageid}`,
+            source: 'commons',
+            pageid: f.pageid,
+            title: name,
+            lat: f.lat,
+            lon: f.lon,
+            year,
+            thumb: i.thumb,
+            page: i.page,
+            artist: stripHtml(i.artist),
+            note: stripHtml(i.description).slice(0, 500),
+            category: 'photo',
+            heritage: [],
+            lost: false,
+            ready: true,
+          });
+        }
+        this.emit();
+      });
+    });
+  }
+
   // ---------------------------------------------------------- housekeeping
 
   prune(view) {
@@ -292,7 +436,7 @@ export class LoreStore {
       .sort((a, b) => b[1] - a[1]);
     for (const [p] of ranked.slice(0, this.places.size - MAX_PLACES)) this.places.delete(p.id);
     // Searched areas may no longer be fully loaded.
-    this.searched = { wikipedia: [], osm: [] };
+    this.searched = { wikipedia: [], osm: [], photos: this.searched.photos || [] };
   }
 
   gemThreshold() {
@@ -325,6 +469,27 @@ export class LoreStore {
     storage.set(SAVED_KEY, [...this.saved.values()]);
     this.emit();
   }
+}
+
+const HISTORY_PATTERNS = {
+  en: { timeline: ['Timeline of %'], history: ['History of %'] },
+  de: { timeline: ['Zeittafel von %', 'Chronik von %'], history: ['Geschichte von %', 'Geschichte der Stadt %'] },
+  fr: { timeline: ['Chronologie de %'], history: ['Histoire de %'] },
+  es: { timeline: ['Cronología de %'], history: ['Historia de %'] },
+  it: { timeline: ['Cronologia di %'], history: ['Storia di %'] },
+  nl: { timeline: [], history: ['Geschiedenis van %'] },
+  pl: { timeline: [], history: ['Historia %'] },
+  pt: { timeline: [], history: ['História de %'] },
+};
+
+function historyTitles(lang, title) {
+  const pat = HISTORY_PATTERNS[lang] || { timeline: [], history: [] };
+  const fill = (list) => list.map((t) => t.replace('%', title));
+  return { timeline: fill(pat.timeline), history: fill(pat.history) };
+}
+
+function wikiUrl(lang, title) {
+  return `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`;
 }
 
 function inscribedBox(lat, lon, radius) {

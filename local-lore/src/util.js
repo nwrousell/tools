@@ -79,14 +79,16 @@ export function readHash() {
   if (m) out.view = { zoom: Number(m[1]), lat: Number(m[2]), lon: Number(m[3]) };
   if (params.get('lang')) out.lang = params.get('lang');
   if (params.get('place')) out.place = params.get('place');
+  if (/^-?\d{1,4}$/.test(params.get('t') || '')) out.year = Number(params.get('t'));
   return out;
 }
 
-export function writeHash({ view, lang, place }) {
+export function writeHash({ view, lang, place, year }) {
   const params = new URLSearchParams();
   if (view) params.set('map', `${Math.round(view.zoom)}/${view.lat.toFixed(5)}/${view.lon.toFixed(5)}`);
   if (lang && lang !== 'en') params.set('lang', lang);
   if (place) params.set('place', place);
+  if (year != null) params.set('t', String(year));
   const next = '#' + params.toString().replace(/%2F/g, '/').replace(/%3A/g, ':');
   if (next !== location.hash) history.replaceState(null, '', next);
 }
