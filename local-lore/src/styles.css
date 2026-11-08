@@ -855,6 +855,16 @@ select {
 }
 
 /* Leaflet theming */
+.lore-tiles {
+  filter: saturate(0.45) sepia(0.15) brightness(1.04) contrast(0.92);
+}
+
+@media (prefers-color-scheme: dark) {
+  .lore-tiles {
+    filter: invert(1) hue-rotate(180deg) saturate(0.35) brightness(0.82) contrast(0.92);
+  }
+}
+
 .leaflet-container {
   font-family: var(--sans);
   background: var(--bg);

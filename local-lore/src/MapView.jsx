@@ -3,12 +3,11 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CATEGORY_BY_ID } from './classify.js';
 
-const TILES = {
-  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-};
+// OpenStreetMap's own tiles: free, no key, attribution required. Their colors are
+// muted (and inverted for dark mode) with a CSS filter on .lore-tiles.
+const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a> · Places: <a href="https://www.wikipedia.org/">Wikipedia</a>, <a href="https://www.wikidata.org/">Wikidata</a>, OSM';
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Places: <a href="https://www.wikipedia.org/">Wikipedia</a>, <a href="https://www.wikidata.org/">Wikidata</a>, OSM';
 
 function viewOf(map) {
   const b = map.getBounds();
@@ -78,17 +77,16 @@ export function MapView({ places, selectedId, onSelect, onMove, initialView, com
     L.control.zoom({ position: 'topright' }).addTo(map);
     map.attributionControl.setPrefix(false);
 
-    const tiles = L.tileLayer(darkRef.current ? TILES.dark : TILES.light, {
+    L.tileLayer(TILE_URL, {
       attribution: ATTRIBUTION,
-      subdomains: 'abcd',
+      maxNativeZoom: 19,
       maxZoom: 20,
-      detectRetina: false,
+      className: 'lore-tiles',
     }).addTo(map);
 
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
     const onScheme = () => {
       darkRef.current = mq.matches;
-      tiles.setUrl(mq.matches ? TILES.dark : TILES.light);
       for (const [id, entry] of markersRef.current) {
         entry.marker.setStyle(styleFor(entry.place, id === selectedRef.current, darkRef.current));
       }
@@ -158,7 +156,10 @@ export function MapView({ places, selectedId, onSelect, onMove, initialView, com
       marker.on('click', (e) => {
         L.DomEvent.stopPropagation(e);
         // With a big touch radius several dots can match; pick the nearest, not the top-most.
-        onSelectRef.current(nearestMarker(e.containerPoint) ?? p.id, { from: 'map' });
+        // (Leaflet's e.containerPoint is the dot's own position for small circles, so use
+        // the raw pointer position instead.)
+        const pt = e.originalEvent ? mapRef.current.mouseEventToContainerPoint(e.originalEvent) : null;
+        onSelectRef.current(nearestMarker(pt) ?? p.id, { from: 'map' });
       });
       marker.addTo(map);
       markers.set(p.id, { marker, sig, place: p });
